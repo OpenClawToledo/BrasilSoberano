@@ -3,7 +3,7 @@
 {% block header %}
 <div class="page-header">
   <h1>📜 Constituição Explicada</h1>
-  <p>Seus direitos em linguagem simples. Saiba o que a Constituição diz — e o que realmente acontece.</p>
+  <p>Seus direitos em linguagem simples. Denuncie quando forem violados.</p>
 </div>
 {% endblock %}
 {% block content %}
@@ -12,12 +12,23 @@
   <a href="/constituicao?followed=1" class="btn {% if followed == '1' %}btn-green{% else %}btn-outline{% endif %}">✅ Cumpridos</a>
   <a href="/constituicao?followed=0" class="btn {% if followed == '0' %}btn-green{% else %}btn-outline{% endif %}">❌ Descumpridos</a>
 </div>
-{% for a in articles %}
-<div class="card article-card">
-  <div class="article-status {% if a.is_followed %}followed{% else %}not-followed{% endif %}">
-    {% if a.is_followed %}✅ Cumprido{% else %}❌ Descumprido{% endif %}
+{% for item in articles %}
+{% set a = item.article %}
+{% set vc = item.violation_count %}
+<div class="card article-card" style="margin-bottom:16px">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+    <span class="article-number">{{ a.article_number }}</span>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      {% if vc > 0 %}
+      <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:#FFEBEE;color:var(--red);font-weight:700">
+        🚨 {{ vc }} denúncia{{ 's' if vc > 1 else '' }}
+      </span>
+      {% endif %}
+      <span class="article-status {% if a.is_followed %}followed{% else %}not-followed{% endif %}">
+        {% if a.is_followed %}✅ Cumprido{% else %}❌ Descumprido{% endif %}
+      </span>
+    </div>
   </div>
-  <span class="article-number">{{ a.article_number }}</span>
   <p style="margin:8px 0;font-style:italic;color:var(--text-light);font-size:0.9rem">"{{ a.official_text }}"</p>
   <p style="font-size:1.05rem"><strong>🗣️ Em português claro:</strong> {{ a.simple_explanation }}</p>
   {% if a.reality_check %}
@@ -25,6 +36,74 @@
     <strong>⚠️ Realidade:</strong> {{ a.reality_check }}
   </div>
   {% endif %}
+  <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <button onclick="denunciarArtigo('{{ a.article_number }}')" 
+            class="btn" style="background:#C62828;color:white;padding:7px 14px;font-size:0.85rem">
+      🚨 Denunciar descumprimento
+    </button>
+    <a href="/denuncia" style="font-size:0.85rem;color:var(--blue)">Ver denúncias →</a>
+  </div>
 </div>
 {% endfor %}
+
+<!-- Modal de denúncia rápida -->
+<div id="denuncia-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:500;overflow-y:auto">
+  <div style="max-width:500px;margin:40px auto;padding:16px">
+    <div class="card">
+      <h3>🚨 Denunciar: <span id="modal-article-num"></span></h3>
+      <div style="display:grid;gap:12px;margin-top:16px">
+        <select id="modal-level" class="form-input">
+          <option value="bairro">🏘️ Bairro</option>
+          <option value="cidade">🏙️ Cidade</option>
+          <option value="estado">🗺️ Estado</option>
+          <option value="federal" selected>🇧🇷 Federal</option>
+          <option value="reserva">🌿 Reserva</option>
+        </select>
+        <input id="modal-location" class="form-input" placeholder="Local (cidade, bairro...)">
+        <textarea id="modal-desc" class="form-input" rows="4" placeholder="Descreva o descumprimento *"></textarea>
+        <input id="modal-evidence" class="form-input" placeholder="Evidências (link, documento...)">
+        <div style="display:flex;gap:8px">
+          <button onclick="submitModalDenuncia()" class="btn btn-green" style="flex:1;padding:12px">✅ Registrar</button>
+          <button onclick="fecharModal()" class="btn btn-outline" style="padding:12px">Cancelar</button>
+        </div>
+        <div id="modal-result" style="display:none;padding:10px;background:#E8F5E9;border-radius:8px;color:var(--green-dark)"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.form-input{width:100%;padding:10px 12px;border:2px solid #E0E0E0;border-radius:8px;font-size:0.95rem}
+.form-input:focus{border-color:var(--red);outline:none}
+</style>
+<script>
+let currentArticle = '';
+function denunciarArtigo(num) {
+  currentArticle = num;
+  document.getElementById('modal-article-num').textContent = num;
+  document.getElementById('denuncia-modal').style.display='block';
+  document.getElementById('modal-desc').value='';
+  document.getElementById('modal-result').style.display='none';
+}
+function fecharModal() {
+  document.getElementById('denuncia-modal').style.display='none';
+}
+function submitModalDenuncia() {
+  const data = {
+    article_number: currentArticle,
+    level: document.getElementById('modal-level').value,
+    location: document.getElementById('modal-location').value,
+    description: document.getElementById('modal-desc').value,
+    evidence: document.getElementById('modal-evidence').value
+  };
+  if(!data.description) return alert('Descreva o descumprimento.');
+  fetch('/denuncia/nova',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+  .then(r=>r.json()).then(d=>{
+    const el=document.getElementById('modal-result');
+    el.textContent='✅ Registrado! '+d.total_violations+' denúncia(s) para '+currentArticle;
+    el.style.display='block';
+    setTimeout(()=>{fecharModal();location.reload();},2000);
+  });
+}
+</script>
 {% endblock %}

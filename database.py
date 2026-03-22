@@ -534,11 +534,106 @@ def seed_painel_tables(db):
     print("  ✅ laws: seeded (6)")
     print("  ✅ processes: seeded (5)")
 
+def seed_v2_tables(db):
+    db.executescript("""
+    CREATE TABLE IF NOT EXISTS violations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        article_number TEXT NOT NULL,
+        description TEXT NOT NULL,
+        level TEXT NOT NULL,
+        location TEXT,
+        evidence TEXT,
+        status TEXT DEFAULT 'recebida',
+        support_count INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS assemblies (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        type TEXT NOT NULL,
+        level TEXT NOT NULL,
+        location TEXT,
+        description TEXT NOT NULL,
+        signatures INTEGER DEFAULT 1,
+        min_signatures INTEGER DEFAULT 10,
+        status TEXT DEFAULT 'coletando',
+        created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS feed_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        source TEXT,
+        level TEXT DEFAULT 'federal',
+        state TEXT,
+        city TEXT,
+        category TEXT DEFAULT 'geral',
+        created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS citizen_roles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        skill_area TEXT NOT NULL,
+        skill_name TEXT NOT NULL,
+        role_title TEXT NOT NULL,
+        role_description TEXT NOT NULL,
+        sector TEXT NOT NULL,
+        rotation_months INTEGER DEFAULT 24,
+        level TEXT DEFAULT 'cidade'
+    );
+    """)
+
+    # Seed feed items
+    feeds = [
+        ("Saneamento básico: 35 milhões ainda sem acesso à água tratada", "Relatório do IBGE aponta que o Brasil ainda tem 35 milhões de pessoas sem acesso a água potável, concentradas no Norte e Nordeste.", "IBGE 2024", "federal", None, None, "infraestrutura"),
+        ("STF julga constitucionalidade do marco temporal indígena", "Supremo analisa se terras indígenas só podem ser demarcadas onde havia ocupação em 1988.", "STF", "federal", None, None, "constituicao"),
+        ("Reforma Tributária: primeiros efeitos em 2025", "CBS começa a substituir PIS/Cofins. Empresas relatam simplificação mas alertam para período de transição.", "Receita Federal", "federal", None, None, "economia"),
+        ("Desmatamento na Amazônia cai 50% em 2023", "INPE registra menor taxa desde 2018. Operações de fiscalização e pressão internacional são apontadas como causas.", "INPE", "federal", "AM", None, "meio_ambiente"),
+        ("Greve dos professores em Minas Gerais entra no 3º mês", "Professores estaduais paralisam aulas em protesto contra defasagem salarial de 40% em relação ao piso nacional.", "Sind-UTE", "estado", "MG", "Belo Horizonte", "educacao"),
+        ("Obra do VLT de Fortaleza parada há 2 anos por falta de verba", "Veículo Leve sobre Trilhos com R$ 800 milhões investidos está paralisado. Governo federal corta repasse.", "Tribunal de Contas", "cidade", "CE", "Fortaleza", "infraestrutura"),
+        ("Dengue: 3 milhões de casos em 2024, recorde histórico", "Brasil bate recorde de casos de dengue. Especialistas apontam falta de saneamento e mudanças climáticas.", "Ministério da Saúde", "federal", None, None, "saude"),
+        ("Fundo Constitucional do DF defasado em R$ 2 bilhões", "Governo federal repassa menos do que é constitucionalmente obrigado ao Distrito Federal há 5 anos consecutivos.", "CLDF", "estado", "DF", "Brasília", "constituicao"),
+        ("Escola sem telhado: 40% das escolas públicas precisam de reforma urgente", "Levantamento do MEC mostra estrutura precária em quase metade das escolas públicas do país.", "MEC 2024", "federal", None, None, "educacao"),
+        ("Garimpo ilegal em Terra Yanomami reduzido em 70% após operação", "IBAMA e Polícia Federal removem 95% dos garimpeiros. Saúde dos Yanomami ainda em estado crítico.", "IBAMA", "federal", "RR", None, "constituicao"),
+    ]
+    for f in feeds:
+        db.execute("INSERT INTO feed_items (title,summary,source,level,state,city,category) VALUES (?,?,?,?,?,?,?)", f)
+
+    # Seed citizen roles
+    roles = [
+        ("saude","Enfermagem","Agente de Saúde Comunitária","Visita domiciliar, prevenção, acompanhamento de famílias vulneráveis no bairro","Saúde Pública",18,"bairro"),
+        ("saude","Medicina","Médico do PSF","Atendimento primário no Posto de Saúde da Família, referenciamento e prevenção","Saúde Pública",24,"cidade"),
+        ("educacao","Pedagogia","Tutor Cívico","Facilitador de educação política e histórica em escolas públicas do bairro","Educação",12,"bairro"),
+        ("educacao","Ensino","Professor da Rede Pública","Docência na rede estadual ou municipal com plano de carreira meritocrático","Educação",36,"cidade"),
+        ("engenharia","Engenharia Civil","Fiscal de Obras Públicas","Supervisão de obras de infraestrutura, saneamento e habitação no município","Infraestrutura",24,"cidade"),
+        ("engenharia","Engenharia de Software","Desenvolvedor de Sistemas Públicos","Desenvolvimento e manutenção de sistemas de governo (DATAPREV, DATASUS, etc.)","Tecnologia",24,"federal"),
+        ("direito","Advocacia","Defensor Público Rotativo","Atendimento jurídico gratuito à população de baixa renda","Justiça",18,"cidade"),
+        ("direito","Mediação","Mediador Comunitário","Resolução de conflitos de bairro sem necessidade de judicialização","Justiça",12,"bairro"),
+        ("administracao","Gestão","Gestor de Projeto Social","Coordenação de projetos sociais financiados por fundo municipal","Assistência Social",18,"cidade"),
+        ("administracao","Finanças","Auditor Cidadão","Revisão de contas públicas municipais com publicação de relatório","Transparência",12,"cidade"),
+        ("ti","Programação","Desenvolvedor Cívico","Criação de ferramentas de transparência e participação popular","Tecnologia",24,"federal"),
+        ("ti","Dados","Analista de Dados Públicos","Análise e publicação de dados do governo em formato acessível","Transparência",18,"federal"),
+        ("comunicacao","Jornalismo","Repórter Cidadão","Cobertura hiperlocal de bairro com publicação em plataforma pública","Comunicação",12,"bairro"),
+        ("campo","Agricultura","Técnico Agrícola Comunitário","Assistência técnica a agricultores familiares e cooperativas rurais","Agricultura",18,"cidade"),
+        ("seguranca","Bombeiro","Defesa Civil Comunitária","Treinamento da comunidade em primeiros socorros e evacuação","Segurança",12,"bairro"),
+        ("cultura","Arte","Agente Cultural","Organização de eventos culturais e preservação do patrimônio local","Cultura",12,"bairro"),
+    ]
+    db.executemany("INSERT INTO citizen_roles (skill_area,skill_name,role_title,role_description,sector,rotation_months,level) VALUES (?,?,?,?,?,?,?)", roles)
+
+    db.commit()
+    print("  ✅ violations: created")
+    print("  ✅ assemblies: created")
+    print("  ✅ feed_items: seeded (10)")
+    print("  ✅ citizen_roles: seeded (16)")
+
 if __name__ == '__main__':
     print("🇧🇷 Brasil Soberano — Inicializando banco de dados...")
     init_db()
     db = sqlite3.connect(DB_PATH)
     seed_civic_tables(db)
     seed_painel_tables(db)
+    seed_v2_tables(db)
     db.close()
     print("✅ Pronto!")

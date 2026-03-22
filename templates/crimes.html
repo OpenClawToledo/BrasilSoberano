@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Crimes Financeiros — Brasil Soberano{% endblock %}
+{% block header %}
+<div class="page-header">
+  <h1>💰 Crimes Financeiros</h1>
+  <p>Como funciona cada burla. Quem paga. O que você pode fazer. A solução real.</p>
+</div>
+{% endblock %}
+{% block content %}
+
+{% if selected %}
+<!-- DETALHE -->
+<a href="/crimes" class="btn btn-outline" style="margin-bottom:20px">← Todos os crimes</a>
+<div class="card" style="border-left:5px solid var(--red)">
+  <h2>{{ selected.icon }} {{ selected.nome }}</h2>
+  <div style="margin-top:20px;display:grid;gap:20px">
+    <div>
+      <h4 style="color:var(--blue);margin-bottom:8px">🔍 Como funciona:</h4>
+      <p style="line-height:1.9">{{ selected.como_funciona }}</p>
+    </div>
+    <div style="background:#FFEBEE;padding:16px;border-radius:8px">
+      <h4 style="color:var(--red);margin-bottom:8px">😡 Quem paga a conta:</h4>
+      <p>{{ selected.quem_paga }}</p>
+    </div>
+    <div style="background:#FFF3E0;padding:16px;border-radius:8px">
+      <h4 style="color:#E65100;margin-bottom:8px">📊 Custo ao país:</h4>
+      <p style="font-size:1.05rem;font-weight:500">{{ selected.custo_pais }}</p>
+    </div>
+    <div>
+      <h4 style="color:var(--text);margin-bottom:8px">🔎 Como identificar:</h4>
+      <ul style="margin-left:20px;line-height:2.2">
+        {% for s in selected.como_identificar %}<li>{{ s }}</li>{% endfor %}
+      </ul>
+    </div>
+    <div style="background:#E3F2FD;padding:16px;border-radius:8px">
+      <h4 style="color:var(--blue);margin-bottom:8px">🧑 O que você pode fazer AGORA:</h4>
+      <p>{{ selected.o_que_fazer }}</p>
+    </div>
+    <div style="background:#E8F5E9;padding:16px;border-radius:8px">
+      <h4 style="color:var(--green-dark);margin-bottom:8px">💡 Solução sistêmica:</h4>
+      <p>{{ selected.solucao }}</p>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<!-- LISTA -->
+<div class="card" style="margin-bottom:24px;border-left:4px solid var(--gold)">
+  <h3>💡 Por que entender crimes financeiros?</h3>
+  <p style="margin-top:8px;line-height:1.8">Cada R$ desviado do erário é R$ 1 a menos em escola, hospital, asfalto. O brasileiro médio paga 33% do seu salário em impostos — e boa parte some antes de chegar ao serviço público. Entender COMO funciona o desvio é o primeiro passo para exigi-lo de volta.</p>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+  {% for c in crimes %}
+  <a href="/crimes?id={{ c.id }}" style="text-decoration:none">
+    <div class="card" style="height:100%;border-left:4px solid var(--red);cursor:pointer;transition:all 0.3s">
+      <div style="font-size:2rem;margin-bottom:8px">{{ c.icon }}</div>
+      <h3 style="color:var(--green-dark);margin-bottom:8px">{{ c.nome }}</h3>
+      <p style="color:var(--text-light);font-size:0.9rem">{{ c.como_funciona[:120] }}...</p>
+      <div style="margin-top:12px;padding:8px 12px;background:#FFEBEE;border-radius:8px;font-size:0.85rem">
+        <strong style="color:var(--red)">Custo:</strong> {{ c.custo_pais }}
+      </div>
+      <p style="margin-top:8px;color:var(--blue);font-size:0.85rem">Ver análise completa →</p>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

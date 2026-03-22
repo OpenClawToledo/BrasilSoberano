@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Denúncias — Brasil Soberano{% endblock %}
+{% block header %}
+<div class="page-header">
+  <h1>🚨 Denúncias Constitucionais</h1>
+  <p>O cidadão como Ministério Público. Denuncie quando a Constituição for descumprida.</p>
+</div>
+{% endblock %}
+{% block content %}
+
+<div class="card" style="border-left:4px solid var(--red);margin-bottom:24px">
+  <h3>⚖️ Você é o Fiscal da Constituição</h3>
+  <p style="margin-top:8px;line-height:1.8">O Art. 1° diz que "todo poder emana do povo". Isso significa que <strong>você tem legitimidade para denunciar</strong> quando qualquer dos três poderes — Executivo, Legislativo ou Judiciário — descumprir a Constituição. Esta plataforma registra, contabiliza e publica cada denúncia.</p>
+  <p style="margin-top:8px;font-size:0.85rem;color:var(--text-light)">📌 Canais oficiais: TCU · CGU · MP Federal · Defensoria Pública · Ouvidoria Nacional</p>
+</div>
+
+<!-- NOVA DENÚNCIA -->
+<div class="card" style="margin-bottom:24px">
+  <h3>📝 Registrar Nova Denúncia</h3>
+  <div style="display:grid;gap:12px;margin-top:16px">
+    <div>
+      <label style="font-weight:600;display:block;margin-bottom:4px">Artigo descumprido *</label>
+      <select id="den-article" class="form-input">
+        {% for a in articles %}
+        <option value="{{ a.article_number }}">{{ a.article_number }} — {{ a.simple_explanation[:80] }}...</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label style="font-weight:600;display:block;margin-bottom:4px">Nível geográfico *</label>
+      <select id="den-level" class="form-input">
+        {% for k,v in levels.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label style="font-weight:600;display:block;margin-bottom:4px">Local (cidade/bairro/estado)</label>
+      <input id="den-location" class="form-input" placeholder="Ex: Favela da Rocinha, Rio de Janeiro">
+    </div>
+    <div>
+      <label style="font-weight:600;display:block;margin-bottom:4px">O que aconteceu? *</label>
+      <textarea id="den-desc" class="form-input" rows="4" placeholder="Descreva objetivamente o descumprimento. Quem? O quê? Quando? Onde?"></textarea>
+    </div>
+    <div>
+      <label style="font-weight:600;display:block;margin-bottom:4px">Evidências (links, documentos, testemunhas)</label>
+      <input id="den-evidence" class="form-input" placeholder="Ex: Portaria nº 123, foto geolocalizada, depoimento de...">
+    </div>
+    <button onclick="submitDenuncia()" class="btn btn-green" style="padding:12px">🚨 Registrar Denúncia</button>
+    <div id="den-result" style="display:none;padding:12px;background:#E8F5E9;border-radius:8px;color:var(--green-dark)"></div>
+  </div>
+</div>
+
+<!-- DENÚNCIAS REGISTRADAS -->
+<h3 style="margin-bottom:16px">📋 Denúncias registradas ({{ violations|length }})</h3>
+{% for v in violations %}
+{% set status_colors = {'recebida':'#9E9E9E','investigando':'#FB8C00','resolvida':'#43A047','arquivada':'#757575'} %}
+{% set sc = status_colors.get(v.status,'#9E9E9E') %}
+<div class="card" style="border-left:4px solid {{ sc }};margin-bottom:12px">
+  <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:{{ sc }}20;color:{{ sc }};font-weight:700">{{ v.status|capitalize }}</span>
+      <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:#FFEBEE;color:var(--red);font-weight:600">{{ v.article_number }}</span>
+      <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:#F5F5F5">{{ levels.get(v.level,v.level) }}{% if v.location %} · {{ v.location }}{% endif %}</span>
+    </div>
+    <span style="font-size:0.75rem;color:var(--text-light)">{{ v.created_at[:10] }}</span>
+  </div>
+  <p style="font-size:0.95rem;margin-bottom:8px">{{ v.description }}</p>
+  {% if v.evidence %}<p style="font-size:0.8rem;color:var(--blue)">📎 {{ v.evidence }}</p>{% endif %}
+  <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
+    <button onclick="apoiarDenuncia({{ v.id }},this)" class="btn btn-outline" style="padding:6px 12px;font-size:0.85rem">
+      🤝 Apoiar (<span id="sup-{{ v.id }}">{{ v.support_count }}</span>)
+    </button>
+    <span style="font-size:0.8rem;color:var(--text-light)">cidadãos confirmam este descumprimento</span>
+  </div>
+</div>
+{% endfor %}
+{% if not violations %}
+<div class="card" style="text-align:center;padding:30px">
+  <p style="color:var(--text-light)">Nenhuma denúncia registrada ainda. Seja o primeiro a fiscalizar.</p>
+</div>
+{% endif %}
+
+<style>
+.form-input{width:100%;padding:10px 12px;border:2px solid #E0E0E0;border-radius:8px;font-size:0.95rem}
+.form-input:focus{border-color:var(--red);outline:none}
+</style>
+
+<script>
+function submitDenuncia() {
+  const data = {
+    article_number: document.getElementById('den-article').value,
+    level: document.getElementById('den-level').value,
+    location: document.getElementById('den-location').value,
+    description: document.getElementById('den-desc').value,
+    evidence: document.getElementById('den-evidence').value
+  };
+  if (!data.description) return alert('Descreva o que aconteceu.');
+  fetch('/denuncia/nova', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)
+  }).then(r=>r.json()).then(d=>{
+    const el = document.getElementById('den-result');
+    el.textContent = '✅ Denúncia registrada! ' + d.total_violations + ' denúncias para o ' + data.article_number + '. Compartilhe para pressionar por resposta.';
+    el.style.display='block';
+    setTimeout(()=>location.reload(),3000);
+  });
+}
+
+function apoiarDenuncia(id, btn) {
+  btn.disabled=true;
+  fetch('/denuncia/apoiar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})})
+  .then(r=>r.json()).then(d=>{ document.getElementById('sup-'+id).textContent=d.support_count; });
+}
+</script>
+{% endblock %}

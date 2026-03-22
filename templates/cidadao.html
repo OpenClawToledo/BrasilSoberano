@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Cidadão — Brasil Soberano{% endblock %}
+{% block header %}
+<div class="page-header">
+  <h1>🧑 Meu Papel no Brasil</h1>
+  <p>Descubra como suas habilidades servem ao país. Solicite assembleias. Acompanhe denúncias.</p>
+</div>
+{% endblock %}
+{% block content %}
+
+<!-- Tabs -->
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:24px">
+  <button class="btn btn-green tab-btn active" onclick="showTab('papel')">🎯 Meu Papel</button>
+  <button class="btn btn-outline tab-btn" onclick="showTab('assembleia')">📢 Assembleias</button>
+  <button class="btn btn-outline tab-btn" onclick="showTab('rotatividade')">🔄 Rotatividade</button>
+</div>
+
+<!-- MEU PAPEL -->
+<div id="tab-papel" class="tab-c">
+  <div class="card" style="border-left:4px solid var(--gold);margin-bottom:20px">
+    <h3>Qual é a sua área de habilidade?</h3>
+    <p style="color:var(--text-light);margin:8px 0 16px">Selecione abaixo para ver os cargos públicos disponíveis para você, com plano de rotatividade e integração.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      {% for k,v in skill_areas.items() %}
+      <a href="/cidadao?skill={{ k }}" class="btn {% if selected_skill==k %}btn-green{% else %}btn-outline{% endif %}" style="font-size:0.85rem">{{ v }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if roles %}
+  <h3 style="margin-bottom:16px;color:var(--green-dark)">Cargos disponíveis para {{ skill_areas[selected_skill] }}:</h3>
+  {% for r in roles %}
+  {% set level_colors = {'bairro':'#43A047','cidade':'#1E88E5','estado':'#8E24AA','federal':'#C62828','reserva':'#2E7D32'} %}
+  {% set lc = level_colors.get(r.level,'#9E9E9E') %}
+  <div class="card" style="border-left:5px solid {{ lc }};margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+      <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:{{ lc }}15;color:{{ lc }};font-weight:700">{{ levels[r.level] }}</span>
+      <span style="font-size:0.8rem;color:var(--text-light)">🔄 Rotatividade: {{ r.rotation_months }} meses</span>
+    </div>
+    <h3 style="margin:0 0 6px;color:var(--green-dark)">{{ r.role_title }}</h3>
+    <p style="color:var(--text-light);font-size:0.9rem;margin-bottom:8px">{{ r.role_description }}</p>
+    <p style="font-size:0.85rem"><strong>Setor:</strong> {{ r.sector }}</p>
+    <div style="background:#E8F5E9;padding:10px;border-radius:8px;margin-top:10px;font-size:0.85rem">
+      💡 <strong>Currículo:</strong> Após {{ r.rotation_months }} meses, este cargo conta como experiência profissional formal no setor público. Você pode avançar para o próximo nível ou mudar de área.
+    </div>
+  </div>
+  {% endfor %}
+  {% elif not selected_skill %}
+  <div class="card" style="background:#F5F5F5;text-align:center;padding:30px">
+    <p style="color:var(--text-light)">Selecione uma área acima para ver os cargos disponíveis.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ASSEMBLEIAS -->
+<div id="tab-assembleia" class="tab-c" style="display:none">
+  <div class="card" style="border-left:4px solid var(--blue);margin-bottom:20px">
+    <h3>📢 Solicitar Assembleia ou Votação</h3>
+    <p style="color:var(--text-light);margin:8px 0 16px;font-size:0.9rem">Como cidadão, você pode exigir assembleias extraordinárias. Com {{ '10' }} assinaturas, a solicitação se torna oficial.</p>
+    <div style="display:grid;gap:12px">
+      <input id="asb-title" class="form-input" placeholder="Título da solicitação *" required>
+      <select id="asb-type" class="form-input">
+        <option value="assembleia">🏛️ Assembleia Comunitária</option>
+        <option value="extraordinaria">🚨 Assembleia Extraordinária</option>
+        <option value="votacao">🗳️ Votação Popular</option>
+        <option value="reuniao">🤝 Reunião com Gestor</option>
+        <option value="audicao">👂 Audiência Pública</option>
+      </select>
+      <select id="asb-level" class="form-input">
+        {% for k,v in levels.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
+      </select>
+      <input id="asb-location" class="form-input" placeholder="Local (bairro, cidade, estado)">
+      <textarea id="asb-desc" class="form-input" rows="3" placeholder="Descreva o motivo e o que deve ser decidido *"></textarea>
+      <button onclick="criarAssembleia()" class="btn btn-blue" style="padding:12px">📢 Solicitar (requer 10 assinaturas)</button>
+    </div>
+    <div id="asb-result" style="display:none;margin-top:12px;padding:12px;background:#E8F5E9;border-radius:8px;color:var(--green-dark)">✅ Solicitação criada! Compartilhe para conseguir assinaturas.</div>
+  </div>
+
+  <h3 style="margin-bottom:16px">Solicitações abertas:</h3>
+  {% for a in assemblies %}
+  {% set pct = [(a.signatures / a.min_signatures * 100), 100] | min | int %}
+  <div class="card" id="asb-{{ a.id }}" style="border-left:4px solid {% if a.status=='aprovada' %}var(--green){% else %}var(--blue){% endif %}">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+      <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:{% if a.status=='aprovada' %}#E8F5E9;color:var(--green){% else %}#E3F2FD;color:var(--blue){% endif %};font-weight:700">
+        {% if a.status=='aprovada' %}✅ Aprovada{% else %}🔄 Coletando assinaturas{% endif %}
+      </span>
+      <span style="font-size:0.8rem;color:var(--text-light)">{{ levels.get(a.level, a.level) }}{% if a.location %} · {{ a.location }}{% endif %}</span>
+    </div>
+    <h3 style="margin:0 0 6px">{{ a.title }}</h3>
+    <p style="color:var(--text-light);font-size:0.9rem;margin-bottom:10px">{{ a.description }}</p>
+    <div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:4px">
+        <span>Assinaturas</span><span id="sig-{{ a.id }}">{{ a.signatures }} / {{ a.min_signatures }}</span>
+      </div>
+      <div style="height:8px;background:#E0E0E0;border-radius:4px">
+        <div id="sigbar-{{ a.id }}" style="height:8px;width:{{ pct }}%;background:var(--blue);border-radius:4px;transition:width 0.5s"></div>
+      </div>
+    </div>
+    {% if a.status != 'aprovada' %}
+    <button onclick="assinar({{ a.id }})" class="btn btn-blue" style="padding:6px 16px;font-size:0.85rem">✍️ Assinar</button>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ROTATIVIDADE -->
+<div id="tab-rotatividade" class="tab-c" style="display:none">
+  <div class="card" style="border-left:4px solid var(--gold)">
+    <h3>🔄 Como funciona a Rotatividade de Cargos</h3>
+    <div style="line-height:2;margin-top:12px">
+      <p><strong>Princípio:</strong> Nenhum cargo público é permanente por direito. Todo servidor tem mandato fixo com avaliação de desempenho.</p>
+      <p><strong>Por quê:</strong> Rotatividade evita captura do cargo, força renovação, cria profissionais versáteis e reduz corrupção por longa permanência.</p>
+      <p><strong>Como funciona:</strong></p>
+      <ol style="margin-left:20px;line-height:2.5">
+        <li>Cidadão declara habilidades → recebe lista de cargos compatíveis</li>
+        <li>Candidatura voluntária ou por indicação comunitária</li>
+        <li>Seleção por currículo + teste público (sem pistolão)</li>
+        <li>Mandato de 12 a 36 meses, renovável 1x com aprovação da comunidade</li>
+        <li>Ao sair: certificado de serviço público, pontuação para progressão</li>
+        <li>Pode mudar de área ou subir de nível (bairro → cidade → estado)</li>
+      </ol>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>📊 Todos os cargos disponíveis</h3>
+    <div style="overflow-x:auto;margin-top:12px">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:var(--green-dark);color:white">
+          <th style="padding:8px;text-align:left">Cargo</th>
+          <th style="padding:8px">Área</th>
+          <th style="padding:8px">Nível</th>
+          <th style="padding:8px">Rotação</th>
+        </tr></thead>
+        <tbody>
+        {% for r in all_roles %}
+        <tr style="border-bottom:1px solid #E0E0E0">
+          <td style="padding:8px;font-size:0.9rem"><strong>{{ r.role_title }}</strong><br><span style="color:var(--text-light);font-size:0.8rem">{{ r.sector }}</span></td>
+          <td style="padding:8px;text-align:center;font-size:0.85rem">{{ r.skill_name }}</td>
+          <td style="padding:8px;text-align:center;font-size:0.85rem">{{ levels.get(r.level,r.level) }}</td>
+          <td style="padding:8px;text-align:center;font-size:0.85rem">{{ r.rotation_months }}m</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+.form-input { width:100%;padding:10px 12px;border:2px solid #E0E0E0;border-radius:8px;font-size:0.95rem; }
+.form-input:focus { border-color:var(--green);outline:none; }
+</style>
+
+<script>
+function showTab(tab) {
+  document.querySelectorAll('.tab-c').forEach(t => t.style.display='none');
+  document.querySelectorAll('.tab-btn').forEach(b => { b.className = b.className.replace('btn-green','btn-outline'); });
+  document.getElementById('tab-'+tab).style.display='block';
+  event.target.className = event.target.className.replace('btn-outline','btn-green');
+}
+
+function criarAssembleia() {
+  const data = {
+    title: document.getElementById('asb-title').value,
+    type: document.getElementById('asb-type').value,
+    level: document.getElementById('asb-level').value,
+    location: document.getElementById('asb-location').value,
+    description: document.getElementById('asb-desc').value
+  };
+  if (!data.title || !data.description) return alert('Preencha título e descrição.');
+  fetch('/cidadao/assembleia', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)
+  }).then(r=>r.json()).then(d=>{
+    if(d.ok) {
+      document.getElementById('asb-result').style.display='block';
+      setTimeout(()=>location.reload(), 2000);
+    }
+  });
+}
+
+function assinar(id) {
+  fetch('/cidadao/assembleia/assinar', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})
+  }).then(r=>r.json()).then(d=>{
+    document.getElementById('sig-'+id).textContent = d.signatures + ' / 10';
+    const pct = Math.min(d.signatures/10*100,100);
+    document.getElementById('sigbar-'+id).style.width = pct+'%';
+    if(d.status==='aprovada') location.reload();
+  });
+}
+</script>
+{% endblock %}

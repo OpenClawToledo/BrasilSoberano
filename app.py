@@ -12,6 +12,11 @@ from flask import Flask, render_template, request, jsonify, g, send_from_directo
 app = Flask(__name__)
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'brasil_soberano.db')
 
+# Import v2 content
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from routes_v2 import CRIMES_FINANCEIROS, MERCADO_CONTENT
+
 
 def get_db():
     db = getattr(g, '_database', None)
@@ -141,22 +146,7 @@ def simulador_vote():
     })
 
 
-# ─── CONSTITUIÇÃO ────────────────────────────────────────────────────────────
-
-@app.route('/constituicao')
-def constituicao():
-    followed = request.args.get('followed', '')
-    if followed == '1':
-        articles = query_db(
-            'SELECT * FROM constitution_articles WHERE is_followed = 1 ORDER BY id'
-        )
-    elif followed == '0':
-        articles = query_db(
-            'SELECT * FROM constitution_articles WHERE is_followed = 0 ORDER BY id'
-        )
-    else:
-        articles = query_db('SELECT * FROM constitution_articles ORDER BY id')
-    return render_template('constituicao.html', articles=articles, followed=followed)
+# ─── CONSTITUIÇÃO — ver versão v2 abaixo ─────────────────────────────────────
 
 
 # ─── TRANSPARÊNCIA ──────────────────────────────────────────────────────────
@@ -425,6 +415,149 @@ def painel_resumo():
         budget_total=budget_total, budget_exec=budget_exec,
         project_status=PROJECT_STATUS, law_phases=LAW_PHASES,
         process_status=PROCESS_STATUS, priorities=PRIORITIES)
+
+
+# ─── FEED ────────────────────────────────────────────────────────────────────
+
+@app.route('/feed')
+def feed():
+    level = request.args.get('level', '')
+    state = request.args.get('state', '')
+    category = request.args.get('category', '')
+    q = 'SELECT * FROM feed_items WHERE 1=1'
+    args = []
+    if level: q += ' AND level=?'; args.append(level)
+    if state: q += ' AND state=?'; args.append(state)
+    if category: q += ' AND category=?'; args.append(category)
+    q += ' ORDER BY created_at DESC'
+    items = query_db(q, args)
+    cats = query_db('SELECT DISTINCT category FROM feed_items ORDER BY category')
+    states_list = query_db('SELECT DISTINCT state FROM feed_items WHERE state IS NOT NULL ORDER BY state')
+    return render_template('feed.html', items=items, cats=cats, states_list=states_list,
+                           level=level, state=state, category=category)
+
+
+# ─── CIDADÃO ─────────────────────────────────────────────────────────────────
+
+SKILL_AREAS = {
+    "saude": "🏥 Saúde",
+    "educacao": "🎓 Educação",
+    "engenharia": "⚙️ Engenharia",
+    "direito": "⚖️ Direito",
+    "administracao": "📊 Administração",
+    "ti": "💻 TI / Tecnologia",
+    "comunicacao": "📢 Comunicação",
+    "campo": "🌾 Campo / Agricultura",
+    "seguranca": "🛡️ Segurança",
+    "cultura": "🎨 Cultura / Arte"
+}
+
+LEVELS = {"bairro": "🏘️ Bairro", "cidade": "🏙️ Cidade", "estado": "🗺️ Estado", "federal": "🇧🇷 Federal", "reserva": "🌿 Reserva"}
+
+
+@app.route('/cidadao')
+def cidadao():
+    skill_area = request.args.get('skill', '')
+    roles = []
+    if skill_area:
+        roles = query_db('SELECT * FROM citizen_roles WHERE skill_area=? ORDER BY level', (skill_area,))
+    all_roles = query_db('SELECT * FROM citizen_roles ORDER BY skill_area, level')
+    assemblies = query_db("SELECT * FROM assemblies ORDER BY created_at DESC LIMIT 10")
+    violations_count = query_db('SELECT COUNT(*) as c FROM violations', one=True)['c']
+    return render_template('cidadao.html', skill_areas=SKILL_AREAS, levels=LEVELS,
+                           roles=roles, all_roles=all_roles, selected_skill=skill_area,
+                           assemblies=assemblies, violations_count=violations_count)
+
+
+@app.route('/cidadao/assembleia', methods=['POST'])
+def criar_assembleia():
+    data = request.get_json()
+    get_db().execute(
+        'INSERT INTO assemblies (title, type, level, location, description) VALUES (?,?,?,?,?)',
+        (data['title'], data['type'], data['level'], data.get('location', ''), data['description'])
+    )
+    get_db().commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/cidadao/assembleia/assinar', methods=['POST'])
+def assinar_assembleia():
+    aid = request.get_json().get('id')
+    db = get_db()
+    db.execute('UPDATE assemblies SET signatures=signatures+1 WHERE id=?', (aid,))
+    db.commit()
+    row = query_db('SELECT signatures, min_signatures, status FROM assemblies WHERE id=?', (aid,), one=True)
+    new_status = 'aprovada' if row['signatures'] >= row['min_signatures'] else row['status']
+    if new_status == 'aprovada':
+        db.execute("UPDATE assemblies SET status='aprovada' WHERE id=?", (aid,))
+        db.commit()
+    return jsonify({'signatures': row['signatures'], 'status': new_status})
+
+
+# ─── DENÚNCIA CONSTITUCIONAL ─────────────────────────────────────────────────
+
+@app.route('/denuncia')
+def denuncia():
+    violations = query_db('SELECT * FROM violations ORDER BY created_at DESC')
+    articles = query_db('SELECT article_number, simple_explanation FROM constitution_articles ORDER BY id')
+    return render_template('denuncia.html', violations=violations, articles=articles, levels=LEVELS)
+
+
+@app.route('/denuncia/nova', methods=['POST'])
+def nova_denuncia():
+    data = request.get_json()
+    get_db().execute(
+        'INSERT INTO violations (article_number, description, level, location, evidence) VALUES (?,?,?,?,?)',
+        (data['article_number'], data['description'], data['level'],
+         data.get('location', ''), data.get('evidence', ''))
+    )
+    get_db().commit()
+    count = query_db('SELECT COUNT(*) as c FROM violations WHERE article_number=?',
+                     (data['article_number'],), one=True)['c']
+    return jsonify({'ok': True, 'total_violations': count})
+
+
+@app.route('/denuncia/apoiar', methods=['POST'])
+def apoiar_denuncia():
+    vid = request.get_json().get('id')
+    get_db().execute('UPDATE violations SET support_count=support_count+1 WHERE id=?', (vid,))
+    get_db().commit()
+    row = query_db('SELECT support_count FROM violations WHERE id=?', (vid,), one=True)
+    return jsonify({'support_count': row['support_count']})
+
+
+# ─── ECONOMIA ────────────────────────────────────────────────────────────────
+
+@app.route('/crimes')
+def crimes():
+    crime_id = request.args.get('id', '')
+    selected = next((c for c in CRIMES_FINANCEIROS if c['id'] == crime_id), None)
+    return render_template('crimes.html', crimes=CRIMES_FINANCEIROS, selected=selected)
+
+
+@app.route('/mercado')
+def mercado():
+    return render_template('mercado.html', content=MERCADO_CONTENT)
+
+
+# ─── CONSTITUIÇÃO (override com denúncias) ───────────────────────────────────
+
+@app.route('/constituicao')
+def constituicao():
+    followed = request.args.get('followed', '')
+    if followed == '1':
+        articles = query_db('SELECT * FROM constitution_articles WHERE is_followed=1 ORDER BY id')
+    elif followed == '0':
+        articles = query_db('SELECT * FROM constitution_articles WHERE is_followed=0 ORDER BY id')
+    else:
+        articles = query_db('SELECT * FROM constitution_articles ORDER BY id')
+    # Add violation counts per article
+    articles_list = []
+    for a in articles:
+        count = query_db('SELECT COUNT(*) as c FROM violations WHERE article_number=?',
+                         (a['article_number'],), one=True)['c']
+        articles_list.append({'article': a, 'violation_count': count})
+    return render_template('constituicao.html', articles=articles_list, followed=followed)
 
 
 @app.route('/static/sw.js')

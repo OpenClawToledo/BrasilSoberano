@@ -14,22 +14,71 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Brasil Soberano">
+  <style>
+  .nav-group { position:relative; display:inline-block; }
+  .nav-group-btn { color:rgba(255,255,255,0.85);text-decoration:none;padding:6px 12px;border-radius:20px;font-size:0.85rem;font-weight:500;cursor:pointer;background:none;border:none;transition:all 0.3s; }
+  .nav-group-btn:hover,.nav-group-btn.active { background:rgba(255,255,255,0.15);color:var(--gold); }
+  .nav-dropdown { display:none;position:absolute;top:100%;left:0;background:var(--green-dark);border-radius:8px;padding:8px;min-width:180px;z-index:200;box-shadow:0 4px 16px rgba(0,0,0,0.3); }
+  .nav-group:hover .nav-dropdown { display:block; }
+  .nav-dropdown a { display:block;color:rgba(255,255,255,0.85);text-decoration:none;padding:8px 12px;border-radius:6px;font-size:0.85rem;transition:all 0.2s; }
+  .nav-dropdown a:hover { background:rgba(255,255,255,0.15);color:var(--gold); }
+  .nav-home { color:var(--gold);font-size:1.3rem;font-weight:800;text-decoration:none; }
+  .nav-home span { color:white; }
+  </style>
 </head>
 <body>
   <nav class="navbar">
     <div class="container">
-      <a href="/" class="nav-brand">🇧🇷 Brasil <span>Soberano</span></a>
-      <div class="nav-links">
-        <a href="/" {% if request.path == '/' %}class="active"{% endif %}>Timeline</a>
-        <a href="/padroes" {% if request.path == '/padroes' %}class="active"{% endif %}>Padrões</a>
-        <a href="/estados" {% if request.path == '/estados' %}class="active"{% endif %}>Estados</a>
-        <a href="/familias" {% if request.path == '/familias' %}class="active"{% endif %}>Famílias</a>
-        <a href="/simulador" {% if request.path == '/simulador' %}class="active"{% endif %}>Simulador</a>
-        <a href="/constituicao" {% if request.path == '/constituicao' %}class="active"{% endif %}>Constituição</a>
-        <a href="/estudo" {% if request.path.startswith('/estudo') %}class="active"{% endif %}>📚 Estudo</a>
-        <a href="/governar" {% if request.path == '/governar' %}class="active"{% endif %}>🏛️ Governar</a>
-        <a href="/painel" {% if request.path.startswith('/painel') %}class="active"{% endif %}>📋 Painel</a>
-        <a href="/transparencia" {% if request.path == '/transparencia' %}class="active"{% endif %}>🔍</a>
+      <a href="/" class="nav-home">🇧🇷 Brasil <span>Soberano</span></a>
+      <div class="nav-links" style="flex-wrap:wrap">
+
+        <!-- 📚 HISTÓRICO -->
+        <div class="nav-group">
+          <button class="nav-group-btn {% if request.path in ['/','/padroes','/estados','/familias'] %}active{% endif %}">📚 Histórico ▾</button>
+          <div class="nav-dropdown">
+            <a href="/">⏳ Timeline</a>
+            <a href="/padroes">🔄 Padrões</a>
+            <a href="/estados">🗺️ Estados</a>
+            <a href="/familias">👑 Famílias</a>
+          </div>
+        </div>
+
+        <!-- 🏛️ GOVERNO -->
+        <div class="nav-group">
+          <button class="nav-group-btn {% if request.path.startswith('/painel') or request.path in ['/simulador','/governar'] %}active{% endif %}">🏛️ Governo ▾</button>
+          <div class="nav-dropdown">
+            <a href="/painel">📋 Painel de Projetos</a>
+            <a href="/painel?tab=leis">📜 Leis</a>
+            <a href="/painel?tab=processos">⚖️ Processos</a>
+            <a href="/governar">🗳️ Votações</a>
+            <a href="/simulador">🎯 Simulador</a>
+          </div>
+        </div>
+
+        <!-- 🧑 CIDADÃO -->
+        <div class="nav-group">
+          <button class="nav-group-btn {% if request.path in ['/cidadao','/denuncia','/constituicao'] %}active{% endif %}">🧑 Cidadão ▾</button>
+          <div class="nav-dropdown">
+            <a href="/cidadao">🎯 Meu Papel</a>
+            <a href="/denuncia">🚨 Denúncias</a>
+            <a href="/constituicao">📜 Constituição</a>
+          </div>
+        </div>
+
+        <!-- 💰 ECONOMIA -->
+        <div class="nav-group">
+          <button class="nav-group-btn {% if request.path in ['/crimes','/mercado'] %}active{% endif %}">💰 Economia ▾</button>
+          <div class="nav-dropdown">
+            <a href="/crimes">🔍 Crimes Financeiros</a>
+            <a href="/mercado">🏭 Mercado Soberano</a>
+          </div>
+        </div>
+
+        <!-- FEED & ESTUDO -->
+        <a href="/feed" class="nav-group-btn {% if request.path=='/feed' %}active{% endif %}">📰 Feed</a>
+        <a href="/estudo" class="nav-group-btn {% if request.path.startswith('/estudo') %}active{% endif %}">📚 Estudo</a>
+        <a href="/transparencia" class="nav-group-btn {% if request.path=='/transparencia' %}active{% endif %}">🔍</a>
+
       </div>
     </div>
   </nav>
@@ -40,8 +89,8 @@
     </div>
   </main>
   <footer class="footer">
-    <p>🇧🇷 <strong>Brasil Soberano</strong> — Sem dono, sem patrocinador, sem agenda. Só dados.</p>
-    <p style="margin-top:8px">Código aberto. Dados verificáveis. Conhecimento é poder.</p>
+    <p>🇧🇷 <strong>Brasil Soberano</strong> — O app é o imperador que unifica. O cidadão é o poder real.</p>
+    <p style="margin-top:8px;font-size:0.8rem">Sem dono · Sem patrocinador · Sem agenda · Só dados verificáveis</p>
   </footer>
   <script src="/static/js/main.js"></script>
   <script>

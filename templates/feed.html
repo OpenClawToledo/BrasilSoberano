@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Feed — Brasil Soberano{% endblock %}
+{% block header %}
+<div class="page-header">
+  <h1>📰 Feed de Notícias</h1>
+  <p>O que está acontecendo no Brasil — filtrado pelo seu nível geográfico.</p>
+</div>
+{% endblock %}
+{% block content %}
+<form class="filters" method="get">
+  <select name="level" onchange="this.form.submit()">
+    <option value="">Todos os níveis</option>
+    <option value="bairro" {% if level=='bairro' %}selected{% endif %}>🏘️ Bairro</option>
+    <option value="cidade" {% if level=='cidade' %}selected{% endif %}>🏙️ Cidade</option>
+    <option value="estado" {% if level=='estado' %}selected{% endif %}>🗺️ Estado</option>
+    <option value="federal" {% if level=='federal' %}selected{% endif %}>🇧🇷 Federal</option>
+    <option value="reserva" {% if level=='reserva' %}selected{% endif %}>🌿 Reserva</option>
+  </select>
+  <select name="state" onchange="this.form.submit()">
+    <option value="">Todos os estados</option>
+    {% for s in states_list %}<option value="{{ s.state }}" {% if state==s.state %}selected{% endif %}>{{ s.state }}</option>{% endfor %}
+  </select>
+  <select name="category" onchange="this.form.submit()">
+    <option value="">Todas as categorias</option>
+    {% for c in cats %}<option value="{{ c.category }}" {% if category==c.category %}selected{% endif %}>{{ c.category }}</option>{% endfor %}
+  </select>
+  {% if level or state or category %}<a href="/feed" class="btn btn-outline">Limpar</a>{% endif %}
+</form>
+
+{% set cat_icons = {'infraestrutura':'🏗️','educacao':'🎓','saude':'🏥','constituicao':'⚖️','economia':'💰','meio_ambiente':'🌳','geral':'📋'} %}
+{% set level_colors = {'bairro':'#43A047','cidade':'#1E88E5','estado':'#8E24AA','federal':'#C62828','reserva':'#2E7D32'} %}
+
+{% for item in items %}
+{% set lc = level_colors.get(item.level,'#9E9E9E') %}
+<div class="card" style="border-left:5px solid {{ lc }};margin-bottom:16px">
+  <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:{{ lc }}15;color:{{ lc }};font-weight:700">
+        {% if item.level=='bairro' %}🏘️{% elif item.level=='cidade' %}🏙️{% elif item.level=='estado' %}🗺️{% elif item.level=='federal' %}🇧🇷{% else %}🌿{% endif %}
+        {{ item.level|capitalize }}{% if item.state %} · {{ item.state }}{% endif %}{% if item.city %} · {{ item.city }}{% endif %}
+      </span>
+      <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:#F5F5F5">{{ cat_icons.get(item.category,'📋') }} {{ item.category }}</span>
+    </div>
+    <span style="font-size:0.75rem;color:var(--text-light)">{{ item.created_at[:10] }}</span>
+  </div>
+  <h3 style="margin:0 0 8px;font-size:1.05rem">{{ item.title }}</h3>
+  <p style="color:var(--text-light);font-size:0.9rem">{{ item.summary }}</p>
+  {% if item.source %}<p style="font-size:0.8rem;color:var(--text-light);margin-top:8px">📌 Fonte: {{ item.source }}</p>{% endif %}
+</div>
+{% endfor %}
+{% if not items %}
+<div class="card" style="text-align:center;padding:40px">
+  <p style="color:var(--text-light)">Nenhuma notícia encontrada para os filtros selecionados.</p>
+  <a href="/feed" class="btn btn-green" style="margin-top:12px">Ver todas</a>
+</div>
+{% endif %}
+{% endblock %}
