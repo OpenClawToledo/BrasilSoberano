@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Resumo — Painel de Governo{% endblock %}
+{% block header %}
+<div class="page-header">
+  <h1>📊 Resumo Geral</h1>
+  <p>Análise automática do status de todos os projetos, leis e processos.</p>
+</div>
+{% endblock %}
+{% block content %}
+
+<!-- ORÇAMENTO -->
+<div class="card" style="border-top:4px solid var(--green)">
+  <h3>💰 Investimento total registrado</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px">
+    <div style="text-align:center">
+      <div style="font-size:2.5rem;font-weight:800;color:var(--green-dark)">R$ {{ "%.1f"|format(budget_total) }}bi</div>
+      <div style="color:var(--text-light)">Total em projetos</div>
+    </div>
+    <div style="text-align:center">
+      <div style="font-size:2.5rem;font-weight:800;color:var(--blue)">R$ {{ "%.1f"|format(budget_exec) }}bi</div>
+      <div style="color:var(--text-light)">Em execução agora</div>
+    </div>
+  </div>
+</div>
+
+<!-- PROJETOS POR STATUS -->
+<div class="card">
+  <h3>🏗️ Projetos por Status</h3>
+  {% set status_list = ['proposta','aprovado','em_execucao','pausado','concluido','cancelado'] %}
+  {% set status_colors = {'proposta':'#9E9E9E','aprovado':'#43A047','em_execucao':'#1E88E5','pausado':'#FB8C00','concluido':'#2E7D32','cancelado':'#C62828'} %}
+  <div style="margin-top:12px">
+  {% for st in status_list %}
+    {% set count = projects | selectattr('status','eq',st) | list | length %}
+    {% if count > 0 %}
+    <div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:0.9rem;margin-bottom:3px">
+        <span>{{ project_status[st] }}</span><strong>{{ count }}</strong>
+      </div>
+      <div style="height:10px;background:#E0E0E0;border-radius:5px">
+        <div style="height:10px;width:{{ (count / projects|length * 100)|int }}%;background:{{ status_colors[st] }};border-radius:5px"></div>
+      </div>
+    </div>
+    {% endif %}
+  {% endfor %}
+  </div>
+</div>
+
+<!-- LEIS POR FASE -->
+<div class="card">
+  <h3>📜 Pipeline Legislativo</h3>
+  <div style="margin-top:12px">
+  {% for k,v in law_phases.items() %}
+    {% set count = laws | selectattr('phase','eq',k) | list | length %}
+    {% if count > 0 %}
+    <div style="display:flex;justify-content:space-between;padding:8px 12px;border-radius:8px;margin-bottom:6px;background:#F5F5F5">
+      <span>{{ v }}</span><strong>{{ count }}</strong>
+    </div>
+    {% endif %}
+  {% endfor %}
+  </div>
+</div>
+
+<!-- PROCESSOS POR STATUS -->
+<div class="card">
+  <h3>⚖️ Processos Judiciais</h3>
+  <div style="margin-top:12px">
+  {% for k,v in process_status.items() %}
+    {% set count = processes | selectattr('status','eq',k) | list | length %}
+    {% if count > 0 %}
+    <div style="display:flex;justify-content:space-between;padding:8px 12px;border-radius:8px;margin-bottom:6px;background:#F5F5F5">
+      <span>{{ v }}</span><strong>{{ count }}</strong>
+    </div>
+    {% endif %}
+  {% endfor %}
+  </div>
+</div>
+
+<!-- ANÁLISE AUTOMÁTICA -->
+<div class="card" style="border-left:4px solid var(--gold)">
+  <h3>🤖 Auto-Análise do Painel</h3>
+  <div style="margin-top:12px;line-height:2">
+    {% set exec_projects = projects | selectattr('status','eq','em_execucao') | list %}
+    {% set crit_projects = projects | selectattr('priority','eq','critica') | list %}
+    {% set active_laws = laws | selectattr('phase','in',['proposta','comissao','votacao']) | list %}
+    {% set open_procs = processes | rejectattr('status','eq','encerrado') | list %}
+
+    <p>📋 Há <strong>{{ projects|length }} projetos</strong> registrados, sendo <strong>{{ exec_projects|length }} em execução</strong>.</p>
+
+    {% if crit_projects %}
+    <p>🚨 <strong>{{ crit_projects|length }} projeto(s) com prioridade CRÍTICA</strong>:
+      {% for p in crit_projects %}<em>{{ p.title }}</em>{% if not loop.last %}, {% endif %}{% endfor %}.
+    </p>
+    {% endif %}
+
+    <p>📜 <strong>{{ active_laws|length }} lei(s) em tramitação</strong> aguardando votação ou análise em comissão.</p>
+
+    <p>⚖️ <strong>{{ open_procs|length }} processo(s) judicial(is) aberto(s)</strong> no sistema.</p>
+
+    {% set total_budget = projects | sum(attribute='budget_bi') %}
+    <p>💰 O investimento total dos projetos cadastrados é de <strong>R$ {{ "%.1f"|format(total_budget) }} bilhões</strong>.</p>
+
+    {% if exec_projects %}
+    {% set avg_progress = (exec_projects | sum(attribute='progress_pct')) / exec_projects|length %}
+    <p>📊 Progresso médio dos projetos em execução: <strong>{{ "%.0f"|format(avg_progress) }}%</strong>.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap">
+  <a href="/painel" class="btn btn-green">← Voltar ao Painel</a>
+  <a href="/painel/registrar" class="btn btn-gold">➕ Registrar novo</a>
+</div>
+{% endblock %}

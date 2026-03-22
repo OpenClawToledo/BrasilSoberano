@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Timeline — Brasil Soberano{% endblock %}
+{% block header %}
+<div class="page-header">
+  <h1>⏳ Timeline do Brasil</h1>
+  <p>526 anos de história. Conheça para não repetir.</p>
+</div>
+{% endblock %}
+{% block content %}
+<form class="filters" method="get">
+  <select name="category" onchange="this.form.submit()">
+    <option value="">Todas as categorias</option>
+    {% for cat in categories %}
+    <option value="{{ cat.category }}" {% if selected_category == cat.category %}selected{% endif %}>{{ cat.category|capitalize }}</option>
+    {% endfor %}
+  </select>
+  <input type="text" name="search" placeholder="Buscar evento, pessoa..." value="{{ search }}">
+  <button type="submit" class="btn btn-green">Buscar</button>
+  {% if search or selected_category %}<a href="/" class="btn btn-outline">Limpar</a>{% endif %}
+</form>
+<p style="color:var(--text-light);margin-bottom:20px">{{ events|length }} eventos encontrados</p>
+<div class="timeline">
+  {% for event in events %}
+  <div class="timeline-item {{ event.category }}">
+    <div class="card">
+      <span class="timeline-year">{{ event.year }} · <span class="badge badge-{{ event.category }}">{{ event.category }}</span></span>
+      <h3 class="timeline-title">{{ event.title }}</h3>
+      <p class="timeline-desc">{{ event.description }}</p>
+      {% if event.key_figures %}<p class="timeline-figures">👤 {{ event.key_figures }}</p>{% endif %}
+      {% if event.geopolitical_context %}<div class="timeline-geo">🌍 {{ event.geopolitical_context }}</div>{% endif %}
+      {% if event.pattern_name %}<span class="timeline-pattern">🔄 {{ event.pattern_name }}</span>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

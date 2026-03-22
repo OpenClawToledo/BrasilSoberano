@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Brasil Soberano — Plataforma de educação cívica sobre a história do Brasil">
+  <title>{% block title %}Brasil Soberano{% endblock %} 🇧🇷</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="icon" type="image/png" href="/static/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#2E7D32">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Brasil Soberano">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <a href="/" class="nav-brand">🇧🇷 Brasil <span>Soberano</span></a>
+      <div class="nav-links">
+        <a href="/" {% if request.path == '/' %}class="active"{% endif %}>Timeline</a>
+        <a href="/padroes" {% if request.path == '/padroes' %}class="active"{% endif %}>Padrões</a>
+        <a href="/estados" {% if request.path == '/estados' %}class="active"{% endif %}>Estados</a>
+        <a href="/familias" {% if request.path == '/familias' %}class="active"{% endif %}>Famílias</a>
+        <a href="/simulador" {% if request.path == '/simulador' %}class="active"{% endif %}>Simulador</a>
+        <a href="/constituicao" {% if request.path == '/constituicao' %}class="active"{% endif %}>Constituição</a>
+        <a href="/estudo" {% if request.path.startswith('/estudo') %}class="active"{% endif %}>📚 Estudo</a>
+        <a href="/governar" {% if request.path == '/governar' %}class="active"{% endif %}>🏛️ Governar</a>
+        <a href="/painel" {% if request.path.startswith('/painel') %}class="active"{% endif %}>📋 Painel</a>
+        <a href="/transparencia" {% if request.path == '/transparencia' %}class="active"{% endif %}>🔍</a>
+      </div>
+    </div>
+  </nav>
+  {% block header %}{% endblock %}
+  <main class="content">
+    <div class="container">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+  <footer class="footer">
+    <p>🇧🇷 <strong>Brasil Soberano</strong> — Sem dono, sem patrocinador, sem agenda. Só dados.</p>
+    <p style="margin-top:8px">Código aberto. Dados verificáveis. Conhecimento é poder.</p>
+  </footer>
+  <script src="/static/js/main.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/static/sw.js');
+    }
+  </script>
+</body>
+</html>

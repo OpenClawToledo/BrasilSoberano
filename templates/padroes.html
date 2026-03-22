@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Padrões — Brasil Soberano{% endblock %}
+{% block header %}
+<div class="page-header">
+  <h1>🔄 Padrões que se Repetem</h1>
+  <p>7 padrões que definem a história do Brasil. Reconheça-os para não cair neles.</p>
+</div>
+{% endblock %}
+{% block content %}
+{% for pattern in patterns %}
+<div class="card pattern-card">
+  <h3>{{ pattern.id }}. {{ pattern.name }}</h3>
+  <p>{{ pattern.description }}</p>
+  <div class="pattern-modern">
+    <strong>🔍 Equivalente moderno:</strong><br>{{ pattern.modern_equivalent }}
+  </div>
+  {% if pattern_events[pattern.id] %}
+  <h4 style="margin:16px 0 8px;color:var(--text-light)">📚 Exemplos históricos:</h4>
+  <ul style="margin-left:20px">
+    {% for evt in pattern_events[pattern.id] %}
+    <li style="margin-bottom:4px"><strong>{{ evt.year }}</strong> — {{ evt.title }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <div class="pattern-lesson">💡 <strong>Lição:</strong> {{ pattern.lesson }}</div>
+</div>
+{% endfor %}
+{% endblock %}

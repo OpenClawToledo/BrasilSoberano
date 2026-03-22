@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ state.name }} — Brasil Soberano{% endblock %}
+{% block header %}
+<div class="page-header">
+  <h1>{{ state.code }} — {{ state.name }}</h1>
+</div>
+{% endblock %}
+{% block content %}
+<div class="card">
+  <h3>🏛️ Origem Colonial</h3>
+  <p>{{ state.colonial_origin }}</p>
+</div>
+<div class="card">
+  <h3>⚔️ Principais Revoltas</h3>
+  <p>{{ state.main_revolts }}</p>
+</div>
+<div class="card">
+  <h3>💰 História Econômica</h3>
+  <p>{{ state.economic_history }}</p>
+</div>
+<div class="card">
+  <h3>🤝 Conexões com Outros Estados</h3>
+  <p>{{ state.connection_to_others }}</p>
+</div>
+{% if events %}
+<h2 style="margin:24px 0 16px;color:var(--green-dark)">📅 Eventos neste estado</h2>
+<div class="timeline">
+  {% for event in events %}
+  <div class="timeline-item {{ event.category }}">
+    <div class="card">
+      <span class="timeline-year">{{ event.year }}</span>
+      <h3 class="timeline-title">{{ event.title }}</h3>
+      <p class="timeline-desc">{{ event.description }}</p>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+<a href="/estados" class="btn btn-outline" style="margin-top:20px">← Voltar aos estados</a>
+{% endblock %}

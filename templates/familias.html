@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Famílias do Poder — Brasil Soberano{% endblock %}
+{% block header %}
+<div class="page-header">
+  <h1>👑 Famílias do Poder</h1>
+  <p>De quem veio, quem manda hoje. Siga o dinheiro.</p>
+</div>
+{% endblock %}
+{% block content %}
+<div class="filters">
+  <a href="/familias" class="btn {% if not selected_category %}btn-green{% else %}btn-outline{% endif %}">Todas</a>
+  {% for cat in categories %}
+  <a href="/familias?category={{ cat.category }}" class="btn {% if selected_category == cat.category %}btn-green{% else %}btn-outline{% endif %}">{{ cat.category|capitalize }}</a>
+  {% endfor %}
+</div>
+<div class="family-grid">
+  {% for f in families %}
+  <div class="card family-card {{ f.category }}">
+    <span class="badge badge-{% if f.category == 'colonial' %}colonial{% elif f.category == 'moderna' %}republic{% else %}revolt{% endif %}">{{ f.category }}</span>
+    <h3 style="margin-top:8px">{{ f.name }}</h3>
+    <p><strong>📍 Origem:</strong> {{ f.origin }}</p>
+    <p><strong>📅 Período:</strong> {{ f.period }}</p>
+    <p><strong>💼 Atividade:</strong> {{ f.activity }}</p>
+    {% if f.modern_status %}<p style="margin-top:8px;padding:8px;background:rgba(21,101,192,0.06);border-radius:8px"><strong>📊 Hoje:</strong> {{ f.modern_status }}</p>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

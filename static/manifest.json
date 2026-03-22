@@ -1,0 +1,43 @@
+{
+  "name": "Brasil Soberano",
+  "short_name": "Brasil Soberano",
+  "description": "Plataforma de educação cívica sobre a história do Brasil",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1B5E20",
+  "theme_color": "#2E7D32",
+  "orientation": "portrait-primary",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "government"],
+  "shortcuts": [
+    {
+      "name": "Timeline",
+      "url": "/",
+      "description": "História do Brasil de 1500 a 2026"
+    },
+    {
+      "name": "Simulador",
+      "url": "/simulador",
+      "description": "Vote nas decisões históricas"
+    },
+    {
+      "name": "Padrões",
+      "url": "/padroes",
+      "description": "7 padrões que se repetem"
+    }
+  ]
+}

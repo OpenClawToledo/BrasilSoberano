@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Registrar — Painel de Governo{% endblock %}
+{% block header %}
+<div class="page-header">
+  <h1>➕ Registrar</h1>
+  <p>Adicione projetos, leis ou processos ao painel.</p>
+</div>
+{% endblock %}
+{% block content %}
+
+<div style="display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap">
+  <button class="btn btn-green tab-btn active" onclick="showForm('project')">🏗️ Projeto</button>
+  <button class="btn btn-outline tab-btn" onclick="showForm('law')">📜 Lei</button>
+  <button class="btn btn-outline tab-btn" onclick="showForm('process')">⚖️ Processo</button>
+</div>
+
+<div id="success-msg" style="display:none" class="card" style="background:#E8F5E9;border-left:4px solid var(--green)">
+  <h3 style="color:var(--green-dark)">✅ Registrado com sucesso!</h3>
+  <p><a href="/painel" class="btn btn-green" style="margin-top:10px">Ver no Painel →</a></p>
+</div>
+
+<!-- PROJETO -->
+<div id="form-project" class="reg-form">
+<form onsubmit="submitForm(event,'project')">
+  <div class="card">
+    <h3>🏗️ Novo Projeto</h3>
+    <div style="display:grid;gap:14px;margin-top:16px">
+      <div><label style="font-weight:600;display:block;margin-bottom:4px">Título *</label>
+        <input name="title" required class="form-input" placeholder="Nome do projeto"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label style="font-weight:600;display:block;margin-bottom:4px">Tipo *</label>
+          <select name="type" class="form-input">
+            {% for k,v in project_types.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
+          </select></div>
+        <div><label style="font-weight:600;display:block;margin-bottom:4px">Prioridade</label>
+          <select name="priority" class="form-input">
+            {% for k,v in priorities.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
+          </select></div>
+      </div>
+      <div><label style="font-weight:600;display:block;margin-bottom:4px">Descrição *</label>
+        <textarea name="description" required class="form-input" rows="3" placeholder="O que é, onde, para quem, qual o objetivo"></textarea></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label style="font-weight:600;display:block;margin-bottom:4px">Orçamento (R$ bilhões)</label>
+          <input name="budget_bi" type="number" step="0.01" class="form-input" placeholder="Ex: 1.5"></div>
+        <div><label style="font-weight:600;display:block;margin-bottom:4px">Status inicial</label>
+          <select name="status" class="form-input">
+            {% for k,v in project_status.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
+          </select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label style="font-weight:600;display:block;margin-bottom:4px">Responsável</label>
+          <input name="responsible" class="form-input" placeholder="Ex: Ministério da Saúde"></div>
+        <div><label style="font-weight:600;display:block;margin-bottom:4px">Estado (UF)</label>
+          <input name="state" class="form-input" placeholder="Ex: SP ou deixe em branco (nacional)"></div>
+      </div>
+      <button type="submit" class="btn btn-green" style="padding:14px">✅ Registrar Projeto</button>
+    </div>
+  </div>
+</form>
+</div>
+
+<!-- LEI -->
+<div id="form-law" class="reg-form" style="display:none">
+<form onsubmit="submitForm(event,'law')">
+  <div class="card">
+    <h3>📜 Nova Lei / PL / PEC</h3>
+    <div style="display:grid;gap:14px;margin-top:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label style="font-weight:600;display:block;margin-bottom:4px">Número (ex: PL 123/2025)</label>
+          <input name="number" class="form-input" placeholder="PL 000/2025"></div>
+        <div><label style="font-weight:600;display:block;margin-bottom:4px">Tipo</label>
+          <select name="type" class="form-input">
+            <option value="ordinaria">📋 Lei Ordinária</option>
+            <option value="constitucional">⚖️ Emenda Constitucional</option>
+            <option value="complementar">📘 Lei Complementar</option>
+          </select></div>
+      </div>
+      <div><label style="font-weight:600;display:block;margin-bottom:4px">Título *</label>
+        <input name="title" required class="form-input" placeholder="Nome da lei ou projeto"></div>
+      <div><label style="font-weight:600;display:block;margin-bottom:4px">Descrição *</label>
+        <textarea name="description" required class="form-input" rows="3" placeholder="O que propõe, quem afeta, como funciona"></textarea></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label style="font-weight:600;display:block;margin-bottom:4px">Fase atual</label>
+          <select name="phase" class="form-input">
+            {% for k,v in law_phases.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
+          </select></div>
+        <div><label style="font-weight:600;display:block;margin-bottom:4px">Autor</label>
+          <input name="author" class="form-input" placeholder="Ex: Câmara dos Deputados"></div>
+      </div>
+      <div><label style="font-weight:600;display:block;margin-bottom:4px">Impacto esperado</label>
+        <input name="impact" class="form-input" placeholder="O que muda se aprovada?"></div>
+      <button type="submit" class="btn btn-green" style="padding:14px">✅ Registrar Lei</button>
+    </div>
+  </div>
+</form>
+</div>
+
+<!-- PROCESSO -->
+<div id="form-process" class="reg-form" style="display:none">
+<form onsubmit="submitForm(event,'process')">
+  <div class="card">
+    <h3>⚖️ Novo Processo Judicial</h3>
+    <div style="display:grid;gap:14px;margin-top:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label style="font-weight:600;display:block;margin-bottom:4px">Número do processo</label>
+          <input name="case_number" class="form-input" placeholder="Ex: AP 1234/STF"></div>
+        <div><label style="font-weight:600;display:block;margin-bottom:4px">Tribunal</label>
+          <select name="court" class="form-input">
+            <option>STF</option><option>STJ</option><option>TSE</option><option>TCU</option>
+            <option>TRF-1</option><option>TRF-2</option><option>TJ-SP</option><option>Outro</option>
+          </select></div>
+      </div>
+      <div><label style="font-weight:600;display:block;margin-bottom:4px">Título *</label>
+        <input name="title" required class="form-input" placeholder="Descrição curta do caso"></div>
+      <div><label style="font-weight:600;display:block;margin-bottom:4px">Tipo</label>
+        <select name="type" class="form-input">
+          <option value="penal">🔴 Penal</option>
+          <option value="constitucional">⚖️ Constitucional</option>
+          <option value="civil_publica">📋 Ação Civil Pública</option>
+          <option value="administrativo">🏛️ Administrativo</option>
+          <option value="eleitoral">🗳️ Eleitoral</option>
+        </select></div>
+      <div><label style="font-weight:600;display:block;margin-bottom:4px">Descrição *</label>
+        <textarea name="description" required class="form-input" rows="3" placeholder="O que aconteceu, contexto, importância"></textarea></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label style="font-weight:600;display:block;margin-bottom:4px">Réu / Investigado</label>
+          <input name="defendant" class="form-input" placeholder="Nome ou entidade"></div>
+        <div><label style="font-weight:600;display:block;margin-bottom:4px">Status</label>
+          <select name="status" class="form-input">
+            {% for k,v in process_status.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
+          </select></div>
+      </div>
+      <div><label style="font-weight:600;display:block;margin-bottom:4px">Acusação / Objeto</label>
+        <input name="charge" class="form-input" placeholder="Ex: Corrupção passiva, desvio de verbas"></div>
+      <button type="submit" class="btn btn-green" style="padding:14px">✅ Registrar Processo</button>
+    </div>
+  </div>
+</form>
+</div>
+
+<style>
+.form-input { width:100%; padding:10px 12px; border:2px solid #E0E0E0; border-radius:8px; font-size:0.95rem; }
+.form-input:focus { border-color:var(--green); outline:none; }
+</style>
+
+<script>
+function showForm(type) {
+  document.querySelectorAll('.reg-form').forEach(f => f.style.display='none');
+  document.querySelectorAll('.tab-btn').forEach(b => { b.className = b.className.replace('btn-green','btn-outline'); });
+  document.getElementById('form-'+type).style.display='block';
+  event.target.className = event.target.className.replace('btn-outline','btn-green');
+}
+function submitForm(e, kind) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  fd.append('kind', kind);
+  fetch('/painel/registrar', { method:'POST', body: fd })
+    .then(r => r.json()).then(d => {
+      if (d.ok) {
+        e.target.reset();
+        document.getElementById('success-msg').style.display = 'block';
+        window.scrollTo(0,0);
+      }
+    });
+}
+</script>
+{% endblock %}

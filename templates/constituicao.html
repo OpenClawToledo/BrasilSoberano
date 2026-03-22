@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Constituição Explicada — Brasil Soberano{% endblock %}
+{% block header %}
+<div class="page-header">
+  <h1>📜 Constituição Explicada</h1>
+  <p>Seus direitos em linguagem simples. Saiba o que a Constituição diz — e o que realmente acontece.</p>
+</div>
+{% endblock %}
+{% block content %}
+<div class="filters">
+  <a href="/constituicao" class="btn {% if followed == '' %}btn-green{% else %}btn-outline{% endif %}">Todos</a>
+  <a href="/constituicao?followed=1" class="btn {% if followed == '1' %}btn-green{% else %}btn-outline{% endif %}">✅ Cumpridos</a>
+  <a href="/constituicao?followed=0" class="btn {% if followed == '0' %}btn-green{% else %}btn-outline{% endif %}">❌ Descumpridos</a>
+</div>
+{% for a in articles %}
+<div class="card article-card">
+  <div class="article-status {% if a.is_followed %}followed{% else %}not-followed{% endif %}">
+    {% if a.is_followed %}✅ Cumprido{% else %}❌ Descumprido{% endif %}
+  </div>
+  <span class="article-number">{{ a.article_number }}</span>
+  <p style="margin:8px 0;font-style:italic;color:var(--text-light);font-size:0.9rem">"{{ a.official_text }}"</p>
+  <p style="font-size:1.05rem"><strong>🗣️ Em português claro:</strong> {{ a.simple_explanation }}</p>
+  {% if a.reality_check %}
+  <div class="reality-check">
+    <strong>⚠️ Realidade:</strong> {{ a.reality_check }}
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+{% endblock %}

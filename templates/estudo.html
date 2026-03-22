@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Estudo — Brasil Soberano{% endblock %}
+{% block header %}
+<div class="page-header">
+  <h1>📚 Estudo</h1>
+  <p>Trilhas de aprendizado sobre o Brasil. Do básico ao avançado, com quiz no final.</p>
+</div>
+{% endblock %}
+{% block content %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px">
+  {% for t in trilhas %}
+  <a href="/estudo/{{ t.id }}" style="text-decoration:none">
+    <div class="card" style="height:100%;border-left:4px solid var(--green);transition:all 0.3s">
+      <div style="font-size:2.5rem;margin-bottom:12px">{{ t.icon }}</div>
+      <span style="font-size:0.75rem;background:var(--gold);color:#333;padding:3px 10px;border-radius:12px;font-weight:600">{{ t.nivel }}</span>
+      <h3 style="margin:10px 0 8px;color:var(--green-dark)">{{ t.title }}</h3>
+      <p style="color:var(--text-light);font-size:0.9rem">{{ t.descricao }}</p>
+      <p style="margin-top:12px;font-size:0.85rem;color:var(--blue)">{{ t.lessons|length }} lições · quiz incluído →</p>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+<div class="card" style="margin-top:30px;border-left:4px solid var(--gold)">
+  <h3>💡 Por que estudar história?</h3>
+  <p>Porque <strong>quem não conhece o passado repete os mesmos erros</strong>. Cada crise que o Brasil vive hoje tem um paralelo exato nos últimos 500 anos. Reconhecer os padrões é o primeiro passo para quebrá-los.</p>
+</div>
+{% endblock %}

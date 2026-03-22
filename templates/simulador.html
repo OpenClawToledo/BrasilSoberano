@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Simulador de Decisão — Brasil Soberano{% endblock %}
+{% block header %}
+<div class="page-header">
+  <h1>🗳️ Simulador de Decisão</h1>
+  <p>E se VOCÊ tivesse que decidir? Vote e veja o que realmente aconteceu.</p>
+</div>
+{% endblock %}
+{% block content %}
+{% for s in scenarios %}
+<div class="scenario card" id="scenario-{{ s.id }}">
+  <h3>{{ s.title }}</h3>
+  <span class="badge badge-empire">{{ s.year }}</span>
+  <div class="scenario-context">
+    <strong>📋 Contexto:</strong><br>{{ s.context }}
+  </div>
+  <p style="font-weight:600;margin:12px 0 8px;color:var(--green-dark)">O que você faria?</p>
+  <div class="scenario-options">
+    <button class="option-btn option-a" onclick="vote({{ s.id }},'a')">
+      <strong>🅰️ Opção A:</strong><br>{{ s.option_a }}
+    </button>
+    <button class="option-btn option-b" onclick="vote({{ s.id }},'b')">
+      <strong>🅱️ Opção B:</strong><br>{{ s.option_b }}
+    </button>
+  </div>
+  <div class="scenario-result"></div>
+</div>
+{% endfor %}
+{% endblock %}

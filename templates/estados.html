@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Estados — Brasil Soberano{% endblock %}
+{% block header %}
+<div class="page-header">
+  <h1>🗺️ Os 27 Estados</h1>
+  <p>O que nos une é maior do que o que nos divide.</p>
+</div>
+{% endblock %}
+{% block content %}
+<input type="text" placeholder="Buscar estado..." oninput="filterStates(this.value)" style="width:100%;padding:12px;border:2px solid #E0E0E0;border-radius:8px;margin-bottom:20px;font-size:1rem">
+<div class="states-grid">
+  {% for state in states %}
+  <div class="card state-card" onclick="this.querySelector('.state-details').classList.toggle('show')">
+    <span class="state-code">{{ state.code }}</span>
+    <h3 style="font-size:1rem">{{ state.name }}</h3>
+    <div class="state-details" style="display:none;margin-top:12px">
+      <p><strong>🏛️ Origem:</strong> {{ state.colonial_origin }}</p>
+      <p style="margin-top:8px"><strong>⚔️ Revoltas:</strong> {{ state.main_revolts }}</p>
+      <p style="margin-top:8px"><strong>💰 Economia:</strong> {{ state.economic_history }}</p>
+      <p style="margin-top:8px"><strong>🤝 Conexões:</strong> {{ state.connection_to_others }}</p>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+<style>.state-details.show{display:block!important}</style>
+{% endblock %}

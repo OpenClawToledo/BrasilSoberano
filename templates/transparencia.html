@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Transparência — Brasil Soberano{% endblock %}
+{% block header %}
+<div class="page-header">
+  <h1>🔍 Transparência Total</h1>
+  <p>Sem dono. Sem patrocinador. Sem agenda. Só dados verificáveis.</p>
+</div>
+{% endblock %}
+{% block content %}
+<div class="card">
+  <h3>🤔 O que é este app?</h3>
+  <p>Brasil Soberano é uma plataforma de educação cívica que usa dados históricos para ajudar brasileiros a entender sua própria história — e fazer melhores decisões no presente.</p>
+  <p style="margin-top:12px">Não tem partido. Não tem ideologia. Tem dados, fontes e contexto.</p>
+</div>
+
+<div class="card">
+  <h3>📊 Dados no sistema</h3>
+  <table class="hash-table">
+    <thead>
+      <tr><th>Tabela</th><th>Registros</th><th>Hash SHA-256</th></tr>
+    </thead>
+    <tbody>
+      {% for table, hash in hashes.items() %}
+      <tr>
+        <td><strong>{{ table }}</strong></td>
+        <td>{{ counts[table] }}</td>
+        <td><span class="hash-value">{{ hash }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h3>🔐 Como verificar</h3>
+  <p>Cada hash SHA-256 acima é calculado a partir do conteúdo completo de cada tabela, serializado em JSON (UTF-8, chaves ordenadas). Se qualquer dado for alterado, o hash muda.</p>
+  <p style="margin-top:8px">Isso garante: <strong>se os dados mudarem, você saberá.</strong></p>
+</div>
+
+<div class="card">
+  <h3>📚 Fontes</h3>
+  <ul style="margin-left:20px;line-height:2">
+    <li>Constituição Federal de 1988</li>
+    <li>IBGE — Instituto Brasileiro de Geografia e Estatística</li>
+    <li>Autos da Devassa da Inconfidência Mineira</li>
+    <li>Os Sertões — Euclides da Cunha</li>
+    <li>Documentos desclassificados da CIA (Golpe de 1964)</li>
+    <li>Registros coloniais portugueses</li>
+    <li>DIEESE — Departamento Intersindical de Estatística</li>
+    <li>Forbes Brasil — Lista de bilionários</li>
+    <li>Historiografia brasileira acadêmica</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3>🏴 Compromissos</h3>
+  <ul style="margin-left:20px;line-height:2">
+    <li>✅ Zero rastreamento (sem cookies, sem analytics, sem ads)</li>
+    <li>✅ Zero dependências externas (sem CDN, sem Google Fonts)</li>
+    <li>✅ Funciona em qualquer celular, mesmo antigo</li>
+    <li>✅ Código aberto e verificável</li>
+    <li>✅ Dados com hash criptográfico</li>
+    <li>✅ Sem partido, sem dono, sem agenda</li>
+  </ul>
+</div>
+{% endblock %}

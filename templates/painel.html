@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}Painel de Governo — Brasil Soberano{% endblock %}
+{% block header %}
+<div class="page-header">
+  <h1>🏛️ Painel de Governo</h1>
+  <p>Projetos · Leis · Processos · Registrar · Resumo</p>
+</div>
+{% endblock %}
+{% block content %}
+
+<!-- STATS BAR -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px">
+  <div class="card" style="text-align:center;padding:16px;border-top:4px solid var(--green)">
+    <div style="font-size:2rem;font-weight:800;color:var(--green)">{{ stats.projects_exec }}/{{ stats.projects_total }}</div>
+    <div style="font-size:0.85rem;color:var(--text-light)">🏗️ Projetos em execução</div>
+  </div>
+  <div class="card" style="text-align:center;padding:16px;border-top:4px solid var(--blue)">
+    <div style="font-size:2rem;font-weight:800;color:var(--blue)">{{ stats.laws_active }}/{{ stats.laws_total }}</div>
+    <div style="font-size:0.85rem;color:var(--text-light)">📜 Leis em tramitação</div>
+  </div>
+  <div class="card" style="text-align:center;padding:16px;border-top:4px solid var(--red)">
+    <div style="font-size:2rem;font-weight:800;color:var(--red)">{{ stats.processes_open }}/{{ stats.processes_total }}</div>
+    <div style="font-size:0.85rem;color:var(--text-light)">⚖️ Processos abertos</div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px">
+  <button class="btn {% if tab=='projetos' %}btn-green{% else %}btn-outline{% endif %} tab-btn" onclick="goTab('projetos')">🏗️ Projetos</button>
+  <button class="btn {% if tab=='leis' %}btn-green{% else %}btn-outline{% endif %} tab-btn" onclick="goTab('leis')">📜 Leis</button>
+  <button class="btn {% if tab=='processos' %}btn-green{% else %}btn-outline{% endif %} tab-btn" onclick="goTab('processos')">⚖️ Processos</button>
+  <a href="/painel/registrar" class="btn btn-gold">➕ Registrar</a>
+  <a href="/painel/resumo" class="btn btn-blue">📊 Resumo</a>
+</div>
+
+<!-- LEGENDA -->
+<div class="card" style="padding:12px 16px;background:#F5F5F5;margin-bottom:20px" id="legend-box">
+  <strong style="font-size:0.85rem">📖 Legenda de status:</strong>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;font-size:0.8rem">
+    {% if tab == 'projetos' %}
+      {% for k,v in project_status.items() %}<span style="background:white;padding:2px 8px;border-radius:8px;border:1px solid #E0E0E0">{{ v }}</span>{% endfor %}
+    {% elif tab == 'leis' %}
+      {% for k,v in law_phases.items() %}<span style="background:white;padding:2px 8px;border-radius:8px;border:1px solid #E0E0E0">{{ v }}</span>{% endfor %}
+    {% else %}
+      {% for k,v in process_status.items() %}<span style="background:white;padding:2px 8px;border-radius:8px;border:1px solid #E0E0E0">{{ v }}</span>{% endfor %}
+    {% endif %}
+  </div>
+</div>
+
+<!-- ===== PROJETOS ===== -->
+<div id="tab-projetos" class="tab-section" {% if tab != 'projetos' %}style="display:none"{% endif %}>
+  <form class="filters" method="get" action="/painel">
+    <input type="hidden" name="tab" value="projetos">
+    <select name="type" onchange="this.form.submit()">
+      <option value="">Todos os tipos</option>
+      {% for k,v in project_types.items() %}<option value="{{ k }}" {% if ftype==k %}selected{% endif %}>{{ v }}</option>{% endfor %}
+    </select>
+    <select name="status" onchange="this.form.submit()">
+      <option value="">Todos os status</option>
+      {% for k,v in project_status.items() %}<option value="{{ k }}" {% if fstatus==k %}selected{% endif %}>{{ v }}</option>{% endfor %}
+    </select>
+    {% if ftype or fstatus %}<a href="/painel?tab=projetos" class="btn btn-outline">Limpar</a>{% endif %}
+  </form>
+
+  {% for p in projects %}
+  {% set prio_color = {'baixa':'#43A047','media':'#FB8C00','alta':'#E53935','critica':'#B71C1C'}[p.priority] %}
+  {% set stat_color = {'proposta':'#9E9E9E','aprovado':'#43A047','em_execucao':'#1E88E5','pausado':'#FB8C00','concluido':'#2E7D32','cancelado':'#C62828'}[p.status] %}
+  <div class="card" style="border-left:5px solid {{ stat_color }};margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:{{ stat_color }}20;color:{{ stat_color }};font-weight:700">{{ project_status[p.status] }}</span>
+        <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:#F5F5F5;color:var(--text-light)">{{ project_types[p.type] }}</span>
+        <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:{{ prio_color }}15;color:{{ prio_color }};font-weight:600">{{ priorities[p.priority] }}</span>
+      </div>
+      {% if p.budget_bi > 0 %}<span style="font-weight:700;color:var(--green-dark)">R$ {{ "%.1f"|format(p.budget_bi) }}bi</span>{% endif %}
+    </div>
+    <h3 style="margin:0 0 8px">{{ p.title }}</h3>
+    <p style="color:var(--text-light);font-size:0.9rem;margin-bottom:10px">{{ p.description }}</p>
+    {% if p.responsible %}<p style="font-size:0.8rem;color:var(--text-light)">👤 {{ p.responsible }}{% if p.state %} · {{ p.state }}{% endif %}</p>{% endif %}
+    {% if p.status == 'em_execucao' %}
+    <div style="margin:10px 0">
+      <div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:4px">
+        <span>Progresso</span><span>{{ p.progress_pct }}%</span>
+      </div>
+      <div style="height:8px;background:#E0E0E0;border-radius:4px">
+        <div style="height:8px;width:{{ p.progress_pct }}%;background:var(--blue);border-radius:4px"></div>
+      </div>
+    </div>
+    {% endif %}
+    <div style="display:flex;gap:6px;margin-top:12px">
+      <button class="btn btn-green" style="padding:6px 14px;font-size:0.85rem" onclick="votarPainel('project',{{ p.id }},'yes',this)">👍 {{ p.votes_yes }}</button>
+      <button class="btn" style="padding:6px 14px;font-size:0.85rem;background:#C62828;color:white" onclick="votarPainel('project',{{ p.id }},'no',this)">👎 {{ p.votes_no }}</button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ===== LEIS ===== -->
+<div id="tab-leis" class="tab-section" {% if tab != 'leis' %}style="display:none"{% endif %}>
+  <!-- Pipeline visual -->
+  <div style="overflow-x:auto;margin-bottom:20px">
+    <div style="display:flex;gap:0;min-width:600px">
+      {% for k,v in law_phases.items() %}
+      {% set count = laws | selectattr('phase','eq',k) | list | length %}
+      <div style="flex:1;text-align:center;padding:8px 4px;background:{% if count > 0 %}var(--green-dark){% else %}#BDBDBD{% endif %};color:white;font-size:0.75rem;border-right:1px solid rgba(255,255,255,0.3)">
+        <div style="font-size:1rem">{{ v.split(' ')[0] }}</div>
+        <div style="font-weight:700;font-size:1.2rem">{{ count }}</div>
+        <div>{{ v.split(' ')[1] if ' ' in v else v }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% for l in laws %}
+  {% set phase_colors = {'proposta':'#9E9E9E','comissao':'#FB8C00','votacao':'#1E88E5','sancionada':'#43A047','vetada':'#C62828','promulgada':'#2E7D32','arquivada':'#757575'} %}
+  {% set pc = phase_colors.get(l.phase,'#9E9E9E') %}
+  <div class="card" style="border-left:5px solid {{ pc }};margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+      <div style="display:flex;gap:6px">
+        <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:{{ pc }}20;color:{{ pc }};font-weight:700">{{ law_phases[l.phase] }}</span>
+        <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:#F5F5F5;color:var(--text-light)">{{ '⚖️ Constitucional' if l.type=='constitucional' else '📋 Ordinária' }}</span>
+      </div>
+      {% if l.number %}<span style="font-size:0.8rem;font-weight:600;color:var(--blue)">{{ l.number }}</span>{% endif %}
+    </div>
+    <h3 style="margin:0 0 8px">{{ l.title }}</h3>
+    <p style="color:var(--text-light);font-size:0.9rem;margin-bottom:8px">{{ l.description }}</p>
+    {% if l.impact %}<div style="background:#E8F5E9;padding:8px 12px;border-radius:8px;font-size:0.85rem;margin-bottom:10px">💡 <strong>Impacto:</strong> {{ l.impact }}</div>{% endif %}
+    {% if l.author %}<p style="font-size:0.8rem;color:var(--text-light)">👤 {{ l.author }}</p>{% endif %}
+    {% if l.phase in ['proposta','comissao','votacao'] %}
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <button class="btn btn-green" style="padding:6px 14px;font-size:0.85rem" onclick="votarPainel('law',{{ l.id }},'yes',this)">✅ Apoio {{ l.votes_yes }}</button>
+      <button class="btn" style="padding:6px 14px;font-size:0.85rem;background:#C62828;color:white" onclick="votarPainel('law',{{ l.id }},'no',this)">❌ Contra {{ l.votes_no }}</button>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ===== PROCESSOS ===== -->
+<div id="tab-processos" class="tab-section" {% if tab != 'processos' %}style="display:none"{% endif %}>
+  {% for pr in processes %}
+  {% set stat_colors = {'abertura':'#9E9E9E','instrucao':'#FB8C00','julgamento':'#1E88E5','sentenca':'#8E24AA','recurso':'#F4511E','encerrado':'#2E7D32'} %}
+  {% set sc = stat_colors.get(pr.status,'#9E9E9E') %}
+  <div class="card" style="border-left:5px solid {{ sc }};margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+      <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:{{ sc }}20;color:{{ sc }};font-weight:700">{{ process_status[pr.status] }}</span>
+      <span style="font-size:0.8rem;color:var(--blue);font-weight:600">{{ pr.court }}{% if pr.case_number %} · {{ pr.case_number }}{% endif %}</span>
+    </div>
+    <h3 style="margin:0 0 8px">{{ pr.title }}</h3>
+    <p style="color:var(--text-light);font-size:0.9rem;margin-bottom:8px">{{ pr.description }}</p>
+    {% if pr.defendant %}<p style="font-size:0.85rem"><strong>🧑 Réu/Investigado:</strong> {{ pr.defendant }}</p>{% endif %}
+    {% if pr.charge %}<div style="background:#FFEBEE;padding:8px 12px;border-radius:8px;font-size:0.85rem;margin:8px 0"><strong>⚖️ Acusação:</strong> {{ pr.charge }}</div>{% endif %}
+    {% if pr.verdict %}<div style="background:#E8F5E9;padding:8px 12px;border-radius:8px;font-size:0.85rem;margin:8px 0"><strong>📜 Decisão:</strong> {{ pr.verdict }}</div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+function goTab(tab) {
+  document.querySelectorAll('.tab-section').forEach(s => s.style.display='none');
+  document.getElementById('tab-'+tab).style.display='block';
+  document.querySelectorAll('.tab-btn').forEach(b => { b.className = b.className.replace('btn-green','btn-outline'); });
+  event.target.className = event.target.className.replace('btn-outline','btn-green');
+}
+
+function votarPainel(kind, id, voto, btn) {
+  fetch('/painel/votar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({kind, id, voto})
+  }).then(r=>r.json()).then(d => {
+    const card = btn.closest('.card');
+    const btns = card.querySelectorAll('button');
+    btns.forEach(b => b.disabled = true);
+    const total = d.votes_yes + d.votes_no || 1;
+    const pct = Math.round(d.votes_yes/total*100);
+    btns[0].textContent = '👍 ' + d.votes_yes;
+    btns[1].textContent = '👎 ' + d.votes_no;
+    const bar = document.createElement('div');
+    bar.style.cssText = 'margin-top:8px;height:6px;background:#E0E0E0;border-radius:3px';
+    bar.innerHTML = `<div style="height:6px;width:${pct}%;background:var(--green);border-radius:3px;transition:width 0.5s"></div>`;
+    btn.parentNode.appendChild(bar);
+  });
+}
+</script>
+{% endblock %}

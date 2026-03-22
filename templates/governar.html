@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Governar — Brasil Soberano{% endblock %}
+{% block header %}
+<div class="page-header">
+  <h1>🏛️ Governar</h1>
+  <p>Propostas, votações, julgamentos e orçamento. Você decide.</p>
+</div>
+{% endblock %}
+{% block content %}
+
+<!-- Tabs -->
+<div style="display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap">
+  <button class="btn btn-green tab-btn active" onclick="showTab('propostas')">📋 Propostas</button>
+  <button class="btn btn-outline tab-btn" onclick="showTab('julgamentos')">⚖️ Julgamentos</button>
+  <button class="btn btn-outline tab-btn" onclick="showTab('orcamento')">💰 Orçamento</button>
+</div>
+
+<!-- PROPOSTAS -->
+<div id="tab-propostas" class="tab-content">
+  <p style="color:var(--text-light);margin-bottom:20px">Vote nas propostas abaixo. Cada voto conta como uma voz cidadã.</p>
+  {% for p in proposals %}
+  <div class="card" id="proposta-{{ p.id }}" style="border-left:4px solid var(--blue)">
+    <span class="badge badge-republic">{{ p.category }}</span>
+    <h3 style="margin:10px 0 8px">{{ p.title }}</h3>
+    <p style="color:var(--text-light);font-size:0.95rem;margin-bottom:16px">{{ p.description }}</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn btn-green" onclick="votarProposta({{ p.id }},'yes',this)">✅ A favor</button>
+      <button class="btn" style="background:#C62828;color:white" onclick="votarProposta({{ p.id }},'no',this)">❌ Contra</button>
+      <button class="btn btn-outline" onclick="votarProposta({{ p.id }},'abstain',this)">⬜ Abster</button>
+    </div>
+    <div class="vote-result-{{ p.id }}" style="display:none;padding:12px;background:#F5F5F5;border-radius:8px">
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <span>✅ <strong class="yes-{{ p.id }}">{{ p.votes_yes }}</strong></span>
+        <span>❌ <strong class="no-{{ p.id }}">{{ p.votes_no }}</strong></span>
+        <span>⬜ <strong class="abs-{{ p.id }}">{{ p.votes_abstain }}</strong></span>
+      </div>
+      <div class="vote-bar-{{ p.id }}" style="margin-top:8px"></div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- JULGAMENTOS -->
+<div id="tab-julgamentos" class="tab-content" style="display:none">
+  <p style="color:var(--text-light);margin-bottom:20px">O tribunal do povo. Julgue figuras históricas com base nos fatos.</p>
+  {% for j in judgments %}
+  <div class="card" id="julgamento-{{ j.id }}" style="border-left:4px solid #C62828">
+    <span style="font-size:0.8rem;color:var(--text-light)">{{ j.target_period }} · {{ j.target_role }}</span>
+    <h3 style="margin:8px 0">{{ j.target_name }}</h3>
+    <p style="margin-bottom:8px;font-size:0.95rem">{{ j.description }}</p>
+    <div style="background:#FFF8E1;padding:10px;border-radius:8px;margin-bottom:16px">
+      <strong>⚖️ A acusação:</strong> {{ j.charge }}
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn" style="background:#C62828;color:white" onclick="votarJulgamento({{ j.id }},'culpado',this)">🔴 Culpado</button>
+      <button class="btn btn-green" onclick="votarJulgamento({{ j.id }},'inocente',this)">🟢 Inocente</button>
+      <button class="btn" style="background:#FF8F00;color:white" onclick="votarJulgamento({{ j.id }},'parcial',this)">🟡 Parcialmente culpado</button>
+    </div>
+    <div class="julg-result-{{ j.id }}" style="display:none;padding:12px;background:#F5F5F5;border-radius:8px">
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <span>🔴 <strong class="culp-{{ j.id }}">{{ j.votes_culpado }}</strong></span>
+        <span>🟢 <strong class="inoc-{{ j.id }}">{{ j.votes_inocente }}</strong></span>
+        <span>🟡 <strong class="parc-{{ j.id }}">{{ j.votes_parcial }}</strong></span>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ORÇAMENTO -->
+<div id="tab-orcamento" class="tab-content" style="display:none">
+  <div class="card" style="margin-bottom:20px">
+    <h3>💰 Você tem R$ {{ total }} bilhões. Como distribuiria?</h3>
+    <p style="color:var(--text-light);margin-top:8px">Arraste os controles para alocar o orçamento federal. Os valores atuais do governo estão pré-preenchidos. Quando salvar, verá a média de todos os brasileiros que participaram.</p>
+  </div>
+  <div id="orcamento-form">
+    {% for s in setores %}
+    <div class="card" style="padding:16px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong>{{ s.setor }}</strong>
+        <span style="color:{{ s.cor }};font-weight:700">R$ <span id="val-{{ loop.index0 }}">{{ s.atual }}</span>bi</span>
+      </div>
+      <input type="range" min="0" max="{{ total }}" value="{{ s.atual }}" 
+             oninput="updateOrc({{ loop.index0 }}, this.value)"
+             data-setor="{{ s.setor }}"
+             style="width:100%;accent-color:{{ s.cor }}">
+      <div style="font-size:0.8rem;color:var(--text-light);margin-top:4px">Atual: R$ {{ s.atual }}bi/ano</div>
+    </div>
+    {% endfor %}
+    <div class="card" style="background:var(--green-dark);color:white">
+      <div style="display:flex;justify-content:space-between">
+        <strong>Total alocado:</strong>
+        <strong id="total-alocado">R$ {{ setores | sum(attribute='atual') }}bi / {{ total }}bi</strong>
+      </div>
+    </div>
+    <button class="btn btn-gold" onclick="salvarOrcamento()" style="margin-top:16px;width:100%;padding:14px">💾 Salvar e ver média dos brasileiros</button>
+    <div id="orcamento-result" style="display:none;margin-top:16px"></div>
+  </div>
+</div>
+
+<script>
+function showTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.tab-btn').forEach(b => { b.className = 'btn btn-outline tab-btn'; });
+  document.getElementById('tab-' + tab).style.display = 'block';
+  event.target.className = 'btn btn-green tab-btn active';
+}
+
+function votarProposta(id, voto, btn) {
+  btn.closest('.card').querySelectorAll('button').forEach(b => b.disabled = true);
+  fetch('/governar/proposta/votar', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({id, voto})
+  }).then(r => r.json()).then(d => {
+    const total = d.votes_yes + d.votes_no + d.votes_abstain || 1;
+    document.querySelector('.yes-' + id).textContent = d.votes_yes;
+    document.querySelector('.no-' + id).textContent = d.votes_no;
+    document.querySelector('.abs-' + id).textContent = d.votes_abstain;
+    const pct = Math.round(d.votes_yes / total * 100);
+    document.querySelector('.vote-bar-' + id).innerHTML = 
+      `<div style="height:8px;background:#E0E0E0;border-radius:4px"><div style="height:8px;width:${pct}%;background:var(--green);border-radius:4px;transition:width 0.5s"></div></div><div style="font-size:0.8rem;margin-top:4px;color:var(--text-light)">${pct}% a favor (${total} votos)</div>`;
+    document.querySelector('.vote-result-' + id).style.display = 'block';
+  });
+}
+
+function votarJulgamento(id, voto, btn) {
+  btn.closest('.card').querySelectorAll('button').forEach(b => b.disabled = true);
+  fetch('/governar/julgamento/votar', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({id, voto})
+  }).then(r => r.json()).then(d => {
+    document.querySelector('.culp-' + id).textContent = d.votes_culpado;
+    document.querySelector('.inoc-' + id).textContent = d.votes_inocente;
+    document.querySelector('.parc-' + id).textContent = d.votes_parcial;
+    document.querySelector('.julg-result-' + id).style.display = 'block';
+  });
+}
+
+const setores = {{ setores | tojson }};
+const totalOrc = {{ total }};
+
+function updateOrc(idx, val) {
+  document.getElementById('val-' + idx).textContent = val;
+  let total = 0;
+  document.querySelectorAll('input[type=range]').forEach(r => total += parseInt(r.value));
+  const el = document.getElementById('total-alocado');
+  el.textContent = `R$ ${total}bi / ${totalOrc}bi`;
+  el.style.color = total > totalOrc ? '#FFD600' : 'white';
+}
+
+function salvarOrcamento() {
+  const alocacoes = {};
+  document.querySelectorAll('input[type=range]').forEach(r => {
+    alocacoes[r.dataset.setor] = parseInt(r.value);
+  });
+  fetch('/governar/orcamento/salvar', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({alocacoes})
+  }).then(r => r.json()).then(d => {
+    let html = '<div class="card"><h3>📊 Média dos participantes:</h3><div style="margin-top:12px">';
+    for (const [setor, avg] of Object.entries(d.medias)) {
+      html += `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #E0E0E0"><span>${setor}</span><strong>R$ ${avg}bi</strong></div>`;
+    }
+    html += '</div><p style="margin-top:12px;color:var(--text-light);font-size:0.9rem">💡 Compare com o orçamento atual. O povo tem prioridades diferentes do governo?</p></div>';
+    const res = document.getElementById('orcamento-result');
+    res.innerHTML = html;
+    res.style.display = 'block';
+    res.scrollIntoView({behavior:'smooth'});
+  });
+}
+</script>
+{% endblock %}
