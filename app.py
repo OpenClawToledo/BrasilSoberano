@@ -17,6 +17,15 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from routes_v2 import CRIMES_FINANCEIROS, MERCADO_CONTENT
 
+# ─── SEGURANÇA ───────────────────────────────────────────────────────────────
+from security import (
+    apply_security_headers, session_fingerprint, ip_hash,
+    csrf_generate, csrf_validate,
+    rate_limit, audit, audit_verify, gerar_recibo_voto
+)
+
+app.after_request(apply_security_headers)
+
 
 def get_db():
     db = getattr(g, '_database', None)
@@ -773,6 +782,7 @@ def governanca_voto(vid):
 
 
 @app.route('/governanca/voto/<int:vid>/votar', methods=['POST'])
+@rate_limit(max_hits=3, window_secs=300, per='session')   # 3 tentativas por 5min por sessão
 def governanca_votar(vid):
     event = query_db('SELECT * FROM voting_events WHERE id=?', (vid,), one=True)
     if not event:
@@ -783,21 +793,24 @@ def governanca_votar(vid):
     data = request.get_json() or {}
     voto = data.get('voto')  # 'sim', 'nao', 'abstencao'
     if voto not in ('sim', 'nao', 'abstencao'):
+        audit('voto_invalido', f'voting_event/{vid}', f'voto={voto}')
         return jsonify({'error': 'Voto inválido'}), 400
 
-    session_hash = _session_hash(request)
+    fp = session_fingerprint()
     zona = data.get('zona', 'federal')
     estado = data.get('estado', '')
 
-    # Impede duplo voto
-    ja = query_db('SELECT id FROM voting_records WHERE voting_event_id=? AND session_hash=?',
-                  (vid, session_hash), one=True)
+    # Impede duplo voto (fingerprint mais robusto)
+    ja = query_db('SELECT voto FROM voting_records WHERE voting_event_id=? AND session_hash=?',
+                  (vid, fp), one=True)
     if ja:
+        audit('duplo_voto_bloqueado', f'voting_event/{vid}', f'zona={zona}')
         return jsonify({'error': 'Você já votou nesta sessão', 'ja_votou': True}), 400
 
+    ts = _dt.datetime.utcnow().isoformat()
     db_conn = get_db()
     db_conn.execute('INSERT INTO voting_records (voting_event_id,session_hash,voto,zona,estado) VALUES (?,?,?,?,?)',
-                    (vid, session_hash, voto, zona, estado))
+                    (vid, fp, voto, zona, estado))
 
     col = {'sim': 'votos_sim', 'nao': 'votos_nao', 'abstencao': 'votos_abstencao'}[voto]
     db_conn.execute(f'UPDATE voting_events SET {col}={col}+1 WHERE id=?', (vid,))
@@ -811,13 +824,22 @@ def governanca_votar(vid):
         db_conn.execute("UPDATE app_changes SET status='aprovada',aprovada_em=datetime('now') WHERE id=?",
                         (updated['change_id'],))
         novo_status = 'aprovada'
+        audit('votacao_aprovada', f'voting_event/{vid}', f'unanimidade atingida | {updated["votos_sim"]+1} votos')
     elif aprovacao is False:
         db_conn.execute("UPDATE voting_events SET status='encerrada',resultado='rejeitada' WHERE id=?", (vid,))
         db_conn.execute("UPDATE app_changes SET status='rejeitada',rejeitada_em=datetime('now'),motivo_rejeicao='Voto NÃO recebido — regra dos 100%' WHERE id=?",
                         (updated['change_id'],))
         novo_status = 'rejeitada'
+        audit('votacao_rejeitada', f'voting_event/{vid}', 'voto NÃO recebido — regra dos 100%')
 
     db_conn.commit()
+
+    # Gerar recibo verificável para o cidadão
+    recibo = gerar_recibo_voto(vid, fp, voto, ts)
+
+    # Registrar no audit log
+    audit('voto_registrado', f'voting_event/{vid}',
+          f'voto={voto} zona={zona} recibo={recibo[:8]}...')
 
     total_v = (updated['votos_sim'] or 0) + (updated['votos_nao'] or 0)
     pct_sim = round(updated['votos_sim'] / total_v * 100, 1) if total_v > 0 else 0
@@ -830,6 +852,7 @@ def governanca_votar(vid):
         'pct_sim': pct_sim,
         'quorum_ok': total_v >= (updated['quorum_minimo'] or 1),
         'novo_status': novo_status,
+        'recibo': recibo,  # cidadão guarda este token para verificação pública
     })
 
 
@@ -905,6 +928,46 @@ def governanca_nova_proposta():
         return jsonify({'ok': True, 'voting_event_id': ve_id, 'redirect': f'/governanca/voto/{ve_id}'})
 
     return render_template('governanca_proposta.html', gravidade_cfg=GRAVIDADE_CFG)
+
+
+# ─── AUDITORIA PÚBLICA ────────────────────────────────────────────────────────
+
+@app.route('/auditoria')
+def auditoria():
+    """Página pública de auditoria — qualquer cidadão pode verificar a integridade."""
+    ok, total, falhas = audit_verify()
+    logs = query_db('SELECT id,ts,tipo,recurso,detalhe,hash_proprio FROM audit_log ORDER BY id DESC LIMIT 50')
+    rate_blocks = query_db('SELECT * FROM rate_limit_log ORDER BY ts DESC LIMIT 20')
+    return render_template('auditoria.html',
+                           chain_ok=ok, total_eventos=total, falhas=falhas,
+                           logs=logs, rate_blocks=rate_blocks)
+
+
+@app.route('/auditoria/verificar-recibo', methods=['POST'])
+@rate_limit(max_hits=20, window_secs=60, per='ip')
+def verificar_recibo():
+    """Cidadão cola o token do recibo e verifica se seu voto foi registrado."""
+    data = request.get_json() or {}
+    token = (data.get('token') or '').strip()[:32]
+    if not token:
+        return jsonify({'erro': 'Token inválido'}), 400
+    row = query_db('SELECT * FROM vote_receipts WHERE receipt_token=?', (token,), one=True)
+    if not row:
+        return jsonify({'encontrado': False, 'msg': 'Recibo não encontrado na base.'})
+    return jsonify({
+        'encontrado': True,
+        'voting_event_id': row['voting_event_id'],
+        'ts': row['ts'],
+        'msg': 'Recibo verificado. Seu voto foi registrado com integridade.'
+    })
+
+
+@app.route('/auditoria/chain.json')
+@rate_limit(max_hits=10, window_secs=60, per='ip')
+def auditoria_chain_json():
+    """Exporta o audit log completo para verificação externa."""
+    logs = query_db('SELECT id,ts,tipo,recurso,hash_anterior,hash_proprio FROM audit_log ORDER BY id ASC')
+    return jsonify([dict(r) for r in logs])
 
 
 def _estimar_cidadaos(zona, estado=''):

@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% block title %}Auditoria Pública — Brasil Soberano{% endblock %}
+{% block content %}
+<style>
+.audit-hero{padding:2rem;border-radius:16px;margin-bottom:2rem;color:white}
+.audit-hero.ok{background:linear-gradient(135deg,#1B5E20,#2E7D32)}
+.audit-hero.falha{background:linear-gradient(135deg,#B71C1C,#C62828)}
+.audit-hero h1{font-size:1.6rem;margin:0 0 .4rem}
+.card{background:white;border-radius:12px;padding:1.4rem;box-shadow:0 2px 12px rgba(0,0,0,.07);margin-bottom:1rem}
+.card h3{font-size:.95rem;margin:0 0 1rem;color:#333;border-bottom:2px solid #f0f0f0;padding-bottom:.5rem}
+.chain-status{display:flex;align-items:center;gap:1rem;font-size:1.2rem;font-weight:700}
+.chain-ok{color:#43A047}
+.chain-fail{color:#E53935}
+.log-item{font-family:monospace;font-size:.75rem;color:#333;padding:5px 0;border-bottom:1px solid #f5f5f5;display:grid;grid-template-columns:auto auto 1fr auto;gap:8px;align-items:center}
+.log-item:last-child{border-bottom:none}
+.badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:.68rem;font-weight:700}
+.b-voto{background:#e8f5e9;color:#1B5E20}
+.b-bloqueio{background:#ffebee;color:#C62828}
+.b-aprovada{background:#e8f5e9;color:#1B5E20}
+.b-rejeitada{background:#ffebee;color:#C62828}
+.b-genesis{background:#f3e5f5;color:#7B1FA2}
+.b-default{background:#e3f2fd;color:#1565C0}
+.hash-chip{font-family:monospace;font-size:.68rem;background:#f5f5f5;padding:2px 6px;border-radius:4px;color:#555}
+.verificador{background:#f9f9f9;border-radius:10px;padding:1.2rem;margin-bottom:1rem}
+.verificador input{width:100%;padding:10px;border:2px solid #e0e0e0;border-radius:8px;font-size:.85rem;margin-bottom:.5rem;font-family:monospace;box-sizing:border-box}
+.verificador input:focus{border-color:#1B5E20;outline:none}
+.btn-ver{background:#1B5E20;color:white;border:none;padding:10px 20px;border-radius:8px;font-weight:700;cursor:pointer;font-size:.85rem}
+.result-ok{background:#e8f5e9;color:#1B5E20;border-radius:8px;padding:.8rem;font-size:.85rem;font-weight:600;display:none}
+.result-fail{background:#ffebee;color:#C62828;border-radius:8px;padding:.8rem;font-size:.85rem;font-weight:600;display:none}
+.section-title{font-size:1rem;font-weight:700;margin:1.5rem 0 .8rem;color:#333;border-left:4px solid #1B5E20;padding-left:.8rem}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem}
+@media(max-width:600px){.stat-grid{grid-template-columns:1fr 1fr}}
+.stat{background:white;border-radius:10px;padding:1rem;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.stat .val{font-size:1.8rem;font-weight:800;color:#1B5E20}
+.stat .lbl{font-size:.75rem;color:#777}
+.princpio{border-left:3px solid #FFD600;padding:.5rem .5rem .5rem 1rem;margin-bottom:.6rem;font-size:.85rem;color:#333}
+</style>
+
+<div class="audit-hero {{ 'ok' if chain_ok else 'falha' }}">
+  <h1>🔍 Auditoria Pública</h1>
+  <div class="chain-status">
+    {% if chain_ok %}
+    <span class="chain-ok">⛓️ CADEIA ÍNTEGRA</span>
+    <span style="font-size:.9rem;opacity:.9;font-weight:400">Todos os {{ total_eventos }} eventos verificados — nenhuma adulteração detectada</span>
+    {% else %}
+    <span class="chain-fail">🚨 ADULTERAÇÃO DETECTADA</span>
+    <span style="font-size:.9rem;opacity:.9;font-weight:400">{{ falhas|length }} inconsistências encontradas no log</span>
+    {% endif %}
+  </div>
+</div>
+
+<div class="stat-grid">
+  <div class="stat"><div class="val">{{ total_eventos }}</div><div class="lbl">Eventos no log</div></div>
+  <div class="stat"><div class="val">{{ '✅' if chain_ok else '🚨' }}</div><div class="lbl">Integridade da cadeia</div></div>
+  <div class="stat"><div class="val">{{ falhas|length }}</div><div class="lbl">Falhas detectadas</div></div>
+</div>
+
+{% if falhas %}
+<div class="card" style="border-left:4px solid #E53935">
+  <h3>🚨 Inconsistências na cadeia</h3>
+  {% for f in falhas %}
+  <div style="background:#ffebee;border-radius:8px;padding:.8rem;margin-bottom:.5rem;font-size:.82rem;color:#C62828">
+    <strong>Evento #{{ f.id }}</strong> — {{ f.problema }}<br>
+    Esperado: <code>{{ f.esperado }}...</code> | Encontrado: <code>{{ f.encontrado }}...</code>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- COMO FUNCIONA A CADEIA -->
+<div class="card">
+  <h3>⛓️ Como funciona o Hash Chain</h3>
+  <div class="princpio">Cada evento registra o <strong>hash SHA-256 do evento anterior</strong>. Se qualquer dado for alterado retroativamente, os hashes seguintes não batem — adulteração detectável por qualquer pessoa.</div>
+  <div class="princpio">O bloco gênesis (<strong>#1</strong>) marca a criação da plataforma. É o ponto zero da cadeia.</div>
+  <div class="princpio">O arquivo <code>audit_log</code> é <strong>append-only</strong> — entradas antigas nunca são modificadas.</div>
+  <div class="princpio">O log completo está disponível em <a href="/auditoria/chain.json" style="color:#1565C0" target="_blank"><strong>/auditoria/chain.json</strong></a> para verificação externa independente.</div>
+</div>
+
+<!-- VERIFICADOR DE RECIBO -->
+<div class="section-title">🎫 Verificar Recibo de Voto</div>
+<div class="verificador">
+  <div style="font-size:.85rem;color:#555;margin-bottom:.8rem">
+    Ao votar, você recebeu um <strong>token de recibo</strong>. Cole aqui para verificar se seu voto foi registrado — sem revelar sua identidade.
+  </div>
+  <input id="recibo-input" placeholder="Cole seu token de recibo (32 caracteres hex)..." maxlength="32">
+  <button class="btn-ver" onclick="verificarRecibo()">🔍 Verificar Recibo</button>
+  <div id="recibo-ok" class="result-ok" style="margin-top:.5rem"></div>
+  <div id="recibo-fail" class="result-fail" style="margin-top:.5rem"></div>
+</div>
+
+<!-- LOG DE AUDITORIA -->
+<div class="section-title">📋 Log de Auditoria — últimos 50 eventos</div>
+<div class="card" style="overflow-x:auto">
+  {% for log in logs %}
+  {% set badge_class = 'b-voto' if 'voto' in log.tipo else 'b-bloqueio' if 'bloqueado' in log.tipo or 'invalido' in log.tipo or 'limit' in log.tipo else 'b-aprovada' if 'aprovada' in log.tipo else 'b-rejeitada' if 'rejeitada' in log.tipo else 'b-genesis' if 'genesis' in log.tipo else 'b-default' %}
+  <div class="log-item">
+    <span style="color:#999">#{{ log.id }}</span>
+    <span class="badge {{ badge_class }}">{{ log.tipo }}</span>
+    <span style="color:#555">{{ log.recurso }}{% if log.detalhe %} — {{ log.detalhe[:60] }}{% if log.detalhe|length > 60 %}...{% endif %}{% endif %}</span>
+    <span class="hash-chip" title="{{ log.hash_proprio }}">{{ log.hash_proprio[:12] }}…</span>
+  </div>
+  {% endfor %}
+  {% if not logs %}
+  <p style="color:#999;font-size:.85rem">Nenhum evento registrado ainda.</p>
+  {% endif %}
+</div>
+
+<!-- BLOQUEIOS POR RATE LIMIT -->
+{% if rate_blocks %}
+<div class="section-title">🛡️ Tentativas Bloqueadas (Rate Limit)</div>
+<div class="card">
+  {% for r in rate_blocks %}
+  <div style="display:flex;gap:8px;font-size:.78rem;padding:4px 0;border-bottom:1px solid #f5f5f5;align-items:center">
+    <span style="color:#E53935">🚫</span>
+    <span class="hash-chip">{{ r.ip_hash[:12] }}…</span>
+    <span style="color:#555">{{ r.rota }}</span>
+    <span style="color:#999;margin-left:auto">{{ r.ts[11:16] }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<script>
+async function verificarRecibo(){
+  const token = document.getElementById('recibo-input').value.trim();
+  if(!token){ return; }
+  const res = await fetch('/auditoria/verificar-recibo',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({token})
+  });
+  const d = await res.json();
+  const ok = document.getElementById('recibo-ok');
+  const fail = document.getElementById('recibo-fail');
+  ok.style.display='none'; fail.style.display='none';
+  if(d.encontrado){
+    ok.style.display='block';
+    ok.textContent = `✅ ${d.msg} | Votação #${d.voting_event_id} | ${(d.ts||'').slice(0,16)} UTC`;
+  } else {
+    fail.style.display='block';
+    fail.textContent = '❌ ' + (d.msg || 'Recibo não encontrado.');
+  }
+}
+</script>
+{% endblock %}
