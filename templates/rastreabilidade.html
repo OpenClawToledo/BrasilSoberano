@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% block title %}Rastreabilidade Fiscal — Brasil Soberano{% endblock %}
+{% block content %}
+<style>
+.rast-hero { background: linear-gradient(135deg, #1B5E20, #2E7D32, #1565C0); color: white; padding: 2rem; border-radius: 16px; margin-bottom: 2rem; }
+.rast-hero h1 { font-size: 1.8rem; margin: 0 0 0.5rem; }
+.rast-hero p { margin: 0; opacity: 0.88; font-size: 0.95rem; }
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem; }
+@media(max-width:600px){ .stats-row { grid-template-columns: 1fr; } }
+.stat-box { background: white; border-radius: 12px; padding: 1.2rem; box-shadow: 0 2px 10px rgba(0,0,0,0.06); text-align: center; }
+.stat-box .val { font-size: 1.8rem; font-weight: 800; }
+.stat-box .lbl { font-size: 0.8rem; color: #777; margin-top: 2px; }
+.tax-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+.tax-card { background: white; border-radius: 12px; padding: 1.3rem; box-shadow: 0 2px 10px rgba(0,0,0,0.06); border-top: 4px solid #e0e0e0; cursor: pointer; transition: all 0.2s; text-decoration: none; color: inherit; display: block; }
+.tax-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.12); }
+.tax-card.direto { border-color: #1565C0; }
+.tax-card.indireto { border-color: #E53935; }
+.tax-card.contribuicao { border-color: #2E7D32; }
+.tax-card.regulatorio { border-color: #FFB300; }
+.tax-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; }
+.tax-codigo { font-size: 1.2rem; font-weight: 800; color: #222; }
+.tax-tipo-badge { font-size: 0.68rem; padding: 3px 8px; border-radius: 10px; font-weight: 700; }
+.direto .tax-tipo-badge { background: #e3f2fd; color: #1565C0; }
+.indireto .tax-tipo-badge { background: #ffebee; color: #C62828; }
+.contribuicao .tax-tipo-badge { background: #e8f5e9; color: #1B5E20; }
+.regulatorio .tax-tipo-badge { background: #fff8e1; color: #F57F17; }
+.tax-nome { font-size: 0.78rem; color: #777; margin-bottom: 0.6rem; }
+.tax-arrecadacao { font-size: 1.1rem; font-weight: 700; color: #1565C0; margin-bottom: 0.4rem; }
+.tax-pills { display: flex; gap: 4px; flex-wrap: wrap; }
+.pill { font-size: 0.68rem; padding: 2px 8px; border-radius: 10px; background: #f5f5f5; color: #555; }
+.pill.progressivo { background: #e8f5e9; color: #2E7D32; }
+.pill.regressivo { background: #ffebee; color: #C62828; }
+.pill.federal { background: #e3f2fd; color: #1565C0; }
+.pill.estadual { background: #f3e5f5; color: #7B1FA2; }
+.pill.municipal { background: #fff8e1; color: #F57F17; }
+.section-title { font-size: 1.2rem; font-weight: 700; margin: 2rem 0 1rem; color: #222; border-left: 4px solid #2E7D32; padding-left: 0.8rem; }
+.extra-list { display: grid; gap: 1rem; }
+.extra-card { background: white; border-radius: 12px; padding: 1.3rem; box-shadow: 0 2px 10px rgba(0,0,0,0.06); border-left: 5px solid #e0e0e0; }
+.extra-card.positivo { border-left-color: #43A047; }
+.extra-card.negativo { border-left-color: #E53935; }
+.extra-card.em_investigacao { border-left-color: #FFB300; }
+.extra-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.extra-titulo { font-size: 0.95rem; font-weight: 700; color: #222; }
+.extra-valor { font-size: 1.1rem; font-weight: 800; color: #1565C0; white-space: nowrap; }
+.extra-meta { font-size: 0.8rem; color: #777; margin-bottom: 0.5rem; }
+.extra-desc { font-size: 0.85rem; color: #444; line-height: 1.5; margin-bottom: 0.5rem; }
+.extra-resultado { font-size: 0.82rem; color: #2E7D32; background: #e8f5e9; border-radius: 8px; padding: 0.5rem 0.8rem; margin-bottom: 0.5rem; }
+.extra-resultado.negativo { color: #C62828; background: #ffebee; }
+.extra-trace { font-size: 0.78rem; color: #555; background: #f5f5f5; border-radius: 6px; padding: 0.4rem 0.7rem; }
+.status-badge { display: inline-block; font-size: 0.72rem; padding: 2px 10px; border-radius: 12px; font-weight: 600; }
+.status-badge.executado { background: #e8f5e9; color: #2E7D32; }
+.status-badge.em_execucao { background: #e3f2fd; color: #1565C0; }
+.status-badge.em_investigacao { background: #fff3e0; color: #E65100; }
+.ver-mais { color: #1565C0; font-size: 0.82rem; font-weight: 600; text-decoration: none; }
+.ver-mais:hover { text-decoration: underline; }
+</style>
+
+<div class="rast-hero">
+  <h1>🔗 Rastreabilidade Fiscal</h1>
+  <p>Cada real que você paga de imposto tem nome, destino e resultado. Aqui você vê tudo — inclusive os gastos extraordinários e os desvios investigados.</p>
+</div>
+
+<!-- ESTATÍSTICAS GERAIS -->
+<div class="stats-row">
+  <div class="stat-box">
+    <div class="val" style="color:#1565C0">R$ {{ '%.0f'|format(total_arrecadado) }}bi</div>
+    <div class="lbl">Arrecadação total estimada/ano</div>
+  </div>
+  <div class="stat-box">
+    <div class="val" style="color:#2E7D32">R$ {{ '%.0f'|format(total_extra) }}bi</div>
+    <div class="lbl">Gastos extraordinários legítimos</div>
+  </div>
+  <div class="stat-box">
+    <div class="val" style="color:#C62828">R$ {{ '%.1f'|format(total_suspeito) }}bi</div>
+    <div class="lbl">Gastos com suspeita / investigação</div>
+  </div>
+</div>
+
+<!-- IMPOSTOS -->
+<div class="section-title">💰 Os 8 Principais Impostos — Clique para ver rastreabilidade completa</div>
+<div class="tax-grid">
+  {% for tax in taxes %}
+  <a href="/rastreabilidade/imposto/{{ tax.codigo }}" class="tax-card {{ tax.tipo }}">
+    <div class="tax-header">
+      <div class="tax-codigo">{{ tax.codigo.replace('_','/') }}</div>
+      <span class="tax-tipo-badge">
+        {{ '⚖️ Direto' if tax.tipo=='direto' else '🛒 Indireto' if tax.tipo=='indireto' else '🤝 Contribuição' if tax.tipo=='contribuicao' else '🎛️ Regulatório' }}
+      </span>
+    </div>
+    <div class="tax-nome">{{ tax.nome_completo }}</div>
+    <div class="tax-arrecadacao">R$ {{ tax.arrecadacao_anual_bi }}bi/ano</div>
+    <div class="tax-pills">
+      <span class="pill {{ tax.esfera }}">{{ tax.esfera }}</span>
+      {% if tax.progressivo %}<span class="pill progressivo">✅ Progressivo</span>{% endif %}
+      {% if tax.regressivo %}<span class="pill regressivo">⚠️ Regressivo</span>{% endif %}
+    </div>
+    <div style="margin-top:0.6rem;font-size:0.8rem;color:#555;line-height:1.4">
+      {{ tax.explicacao_cidada[:100] }}...
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+<!-- GASTOS EXTRAORDINÁRIOS -->
+<div class="section-title">⚡ Gastos Extraordinários — Transparência total</div>
+<p style="font-size:0.85rem;color:#777;margin-bottom:1rem">Gastos fora do orçamento ordinário: emergências, pandemias, catástrofes — e desvios investigados.</p>
+<div class="extra-list">
+  {% for gasto in extraordinary %}
+  <div class="extra-card {{ 'positivo' if gasto.positivo else gasto.status }}">
+    <div class="extra-header">
+      <div>
+        <div class="extra-titulo">
+          {{ '✅' if gasto.positivo and gasto.status=='executado' else '🔄' if gasto.status=='em_execucao' else '🔍' if gasto.status=='em_investigacao' else '⚠️' }}
+          {{ gasto.titulo }}
+        </div>
+        <div class="extra-meta">
+          📅 {{ gasto.exercicio }} &nbsp;|&nbsp;
+          🏛️ {{ gasto.orgao_responsavel }} &nbsp;|&nbsp;
+          <span class="status-badge {{ gasto.status }}">
+            {{ 'Executado' if gasto.status=='executado' else 'Em Execução' if gasto.status=='em_execucao' else 'Em Investigação' }}
+          </span>
+        </div>
+      </div>
+      <div class="extra-valor">R$ {{ gasto.valor_bi }}bi</div>
+    </div>
+
+    <div class="extra-desc">{{ gasto.descricao[:200] }}{% if gasto.descricao|length > 200 %}...{% endif %}</div>
+
+    {% if gasto.resultado %}
+    <div class="extra-resultado {{ '' if gasto.positivo else 'negativo' }}">
+      {{ '📊' if gasto.positivo else '🔴' }} <strong>Resultado:</strong> {{ gasto.resultado[:150] }}{% if gasto.resultado|length > 150 %}...{% endif %}
+    </div>
+    {% endif %}
+
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      {% if gasto.portaria_decreto %}
+      <div class="extra-trace">🗂️ {{ gasto.portaria_decreto }}</div>
+      {% endif %}
+      <a href="/rastreabilidade/gasto-extraordinario/{{ gasto.id }}" class="ver-mais">Ver rastreabilidade completa →</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- LEGENDA -->
+<div style="background:#f9f9f9;border-radius:12px;padding:1.2rem;margin-top:2rem;font-size:0.82rem;color:#555">
+  <strong>📌 Como fiscalizar:</strong>
+  Portal da Transparência: <a href="https://portaldatransparencia.gov.br" target="_blank" style="color:#1565C0">portaldatransparencia.gov.br</a> &nbsp;|&nbsp;
+  TCU: <a href="https://tcu.gov.br" target="_blank" style="color:#1565C0">tcu.gov.br</a> &nbsp;|&nbsp;
+  CGU: <a href="https://cgu.gov.br" target="_blank" style="color:#1565C0">cgu.gov.br</a> &nbsp;|&nbsp;
+  ComprasNet: <a href="https://comprasnet.gov.br" target="_blank" style="color:#1565C0">comprasnet.gov.br</a>
+</div>
+{% endblock %}

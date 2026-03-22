@@ -643,6 +643,62 @@ def votar_denuncia(vid):
     return jsonify(dict(row))
 
 
+# ─── RASTREABILIDADE FISCAL ──────────────────────────────────────────────────
+
+@app.route('/rastreabilidade')
+def rastreabilidade():
+    taxes = query_db('SELECT * FROM tax_types ORDER BY arrecadacao_anual_bi DESC')
+    extraordinary = query_db('SELECT * FROM extraordinary_spending ORDER BY exercicio DESC, valor_bi DESC')
+    total_arrecadado = query_db('SELECT SUM(arrecadacao_anual_bi) as s FROM tax_types', one=True)['s'] or 0
+    total_extra = query_db('SELECT SUM(valor_bi) as s FROM extraordinary_spending WHERE positivo=1', one=True)['s'] or 0
+    total_suspeito = query_db("SELECT SUM(valor_bi) as s FROM extraordinary_spending WHERE positivo=0", one=True)['s'] or 0
+    return render_template('rastreabilidade.html',
+                           taxes=taxes, extraordinary=extraordinary,
+                           total_arrecadado=total_arrecadado,
+                           total_extra=total_extra, total_suspeito=total_suspeito)
+
+
+@app.route('/rastreabilidade/imposto/<codigo>')
+def rastreabilidade_imposto(codigo):
+    tax = query_db('SELECT * FROM tax_types WHERE codigo=?', (codigo.upper(),), one=True)
+    if not tax:
+        return render_template('404.html'), 404
+    td = dict(tax)
+    try: td['destino_legal'] = json.loads(tax['destino_legal'] or '{}')
+    except: td['destino_legal'] = {}
+    try: td['destino_real'] = json.loads(tax['destino_real'] or '{}')
+    except: td['destino_real'] = {}
+    # Projetos financiados por este imposto
+    links = query_db("""
+        SELECT tpl.*, p.title, p.type, p.status, p.progress_pct, p.budget_bi, p.responsible
+        FROM tax_project_links tpl
+        JOIN projects p ON tpl.project_id = p.id
+        WHERE tpl.tax_codigo = ?
+        ORDER BY tpl.valor_bi DESC
+    """, (codigo.upper(),))
+    # Resultados dos projetos ligados
+    outcomes = {}
+    for l in links:
+        pid = l['project_id']
+        outcomes[pid] = query_db('SELECT * FROM project_outcomes WHERE project_id=? ORDER BY positivo DESC', (pid,))
+    return render_template('rastreabilidade_imposto.html',
+                           tax=td, links=links, outcomes=outcomes)
+
+
+@app.route('/rastreabilidade/gasto-extraordinario/<int:gid>')
+def rastreabilidade_gasto(gid):
+    gasto = query_db('SELECT * FROM extraordinary_spending WHERE id=?', (gid,), one=True)
+    if not gasto:
+        return render_template('404.html'), 404
+    return render_template('rastreabilidade_gasto.html', gasto=gasto)
+
+
+@app.route('/api/rastreabilidade/impostos')
+def api_impostos():
+    taxes = query_db('SELECT codigo, nome, tipo, esfera, arrecadacao_anual_bi, progressivo, regressivo FROM tax_types ORDER BY arrecadacao_anual_bi DESC')
+    return jsonify([dict(t) for t in taxes])
+
+
 # ─── DREX — Gestor Financeiro Soberano ──────────────────────────────────────
 
 def calcular_irpf(renda_mensal):

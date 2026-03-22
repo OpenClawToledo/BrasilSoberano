@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% block title %}{{ gasto.titulo }} — Rastreabilidade{% endblock %}
+{% block content %}
+<style>
+.gasto-hero { padding: 2rem; border-radius: 16px; margin-bottom: 2rem; color: white; }
+.gasto-hero.positivo { background: linear-gradient(135deg, #1B5E20, #2E7D32); }
+.gasto-hero.negativo { background: linear-gradient(135deg, #B71C1C, #C62828); }
+.gasto-hero.em_investigacao { background: linear-gradient(135deg, #E65100, #F57F17); }
+.card { background: white; border-radius: 12px; padding: 1.4rem; box-shadow: 0 2px 12px rgba(0,0,0,0.07); margin-bottom: 1rem; }
+.card h3 { font-size: 0.95rem; margin: 0 0 1rem; color: #333; border-bottom: 2px solid #f0f0f0; padding-bottom: 0.5rem; }
+.info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f5f5f5; font-size: 0.88rem; }
+.info-row:last-child { border-bottom: none; }
+.info-row .lbl { color: #777; }
+.info-row .val { font-weight: 600; color: #222; text-align: right; max-width: 60%; }
+.timeline-item { border-left: 3px solid #1565C0; padding: 0.5rem 0 0.5rem 1rem; margin-bottom: 0.8rem; }
+.timeline-item .step { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #1565C0; }
+.timeline-item .desc { font-size: 0.88rem; color: #444; margin: 2px 0; }
+.rastreio-box { background: #e8f5e9; border-radius: 10px; padding: 1rem; border-left: 4px solid #2E7D32; }
+.rastreio-box.alerta { background: #fff3e0; border-left-color: #FF6F00; }
+</style>
+
+<a href="/rastreabilidade" style="display:inline-flex;align-items:center;gap:6px;color:#555;text-decoration:none;font-size:0.88rem;margin-bottom:1rem">
+  ← Voltar para Rastreabilidade
+</a>
+
+{% set hero_class = 'positivo' if gasto.positivo else ('em_investigacao' if gasto.status == 'em_investigacao' else 'negativo') %}
+<div class="gasto-hero {{ hero_class }}">
+  <div style="font-size:0.82rem;opacity:0.75;margin-bottom:0.3rem">
+    ⚡ Gasto Extraordinário &nbsp;|&nbsp; {{ gasto.exercicio }} &nbsp;|&nbsp;
+    {{ 'Executado' if gasto.status=='executado' else 'Em Execução' if gasto.status=='em_execucao' else 'Em Investigação' }}
+  </div>
+  <h1 style="font-size:1.5rem;margin:0 0 0.3rem">{{ gasto.titulo }}</h1>
+  <div style="font-size:1.8rem;font-weight:800;margin:0.3rem 0">R$ {{ gasto.valor_bi }} bilhões</div>
+  <p style="margin:0;opacity:0.88;font-size:0.9rem">{{ gasto.orgao_responsavel }}</p>
+</div>
+
+<div class="card">
+  <h3>📋 Dados do Gasto</h3>
+  <div class="info-row"><span class="lbl">Tipo</span><span class="val">{{ gasto.tipo|replace('_',' ')|title }}</span></div>
+  <div class="info-row"><span class="lbl">Valor</span><span class="val" style="color:#1565C0;font-size:1.05rem">R$ {{ gasto.valor_bi }} bilhões</span></div>
+  <div class="info-row"><span class="lbl">Exercício</span><span class="val">{{ gasto.exercicio }}</span></div>
+  <div class="info-row"><span class="lbl">Órgão responsável</span><span class="val">{{ gasto.orgao_responsavel }}</span></div>
+  {% if gasto.portaria_decreto %}
+  <div class="info-row"><span class="lbl">Base legal</span><span class="val">{{ gasto.portaria_decreto }}</span></div>
+  {% endif %}
+  <div class="info-row"><span class="lbl">Origem do recurso</span><span class="val">{{ gasto.origem_recurso }}</span></div>
+</div>
+
+<div class="card">
+  <h3>📖 Descrição Completa</h3>
+  <p style="font-size:0.9rem;color:#444;line-height:1.7;margin:0">{{ gasto.descricao }}</p>
+</div>
+
+{% if gasto.resultado %}
+<div class="card">
+  <h3>📊 Resultados Obtidos</h3>
+  <div class="{{ 'rastreio-box' if gasto.positivo else 'rastreio-box alerta' }}">
+    {{ '✅' if gasto.positivo else '⚠️' }} {{ gasto.resultado }}
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <h3>🔗 Como Rastrear Este Gasto</h3>
+  <div class="rastreio-box {{ '' if gasto.positivo else 'alerta' }}">
+    <p style="font-size:0.9rem;color:#333;margin:0;line-height:1.6">{{ gasto.rastreabilidade }}</p>
+  </div>
+  <div style="margin-top:1rem;font-size:0.82rem;color:#555">
+    <strong>🔍 Ferramentas de fiscalização:</strong><br>
+    <a href="https://portaldatransparencia.gov.br" target="_blank" style="color:#1565C0">portaldatransparencia.gov.br</a> &nbsp;|&nbsp;
+    <a href="https://tcu.gov.br" target="_blank" style="color:#1565C0">tcu.gov.br</a> &nbsp;|&nbsp;
+    <a href="https://cgu.gov.br" target="_blank" style="color:#1565C0">cgu.gov.br</a> &nbsp;|&nbsp;
+    <a href="https://comprasnet.gov.br" target="_blank" style="color:#1565C0">comprasnet.gov.br</a>
+  </div>
+</div>
+
+<a href="/rastreabilidade" style="display:inline-block;background:#f0f0f0;border-radius:10px;padding:10px 20px;text-decoration:none;color:#333;font-size:0.88rem;font-weight:600">
+  ← Ver todos os gastos extraordinários
+</a>
+{% endblock %}

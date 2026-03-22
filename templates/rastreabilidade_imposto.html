@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+{% block title %}{{ tax.nome }} — Rastreabilidade Fiscal{% endblock %}
+{% block content %}
+<style>
+.tax-hero { padding: 2rem; border-radius: 16px; margin-bottom: 2rem; color: white; }
+.tax-hero.direto { background: linear-gradient(135deg, #1565C0, #0D47A1); }
+.tax-hero.indireto { background: linear-gradient(135deg, #C62828, #B71C1C); }
+.tax-hero.contribuicao { background: linear-gradient(135deg, #1B5E20, #2E7D32); }
+.tax-hero.regulatorio { background: linear-gradient(135deg, #E65100, #BF360C); }
+.tax-hero h1 { font-size: 2rem; margin: 0 0 0.3rem; }
+.tax-hero .subtitle { opacity: 0.88; font-size: 0.95rem; margin: 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+@media(max-width:768px){ .grid2 { grid-template-columns: 1fr; } }
+.card { background: white; border-radius: 12px; padding: 1.4rem; box-shadow: 0 2px 12px rgba(0,0,0,0.07); margin-bottom: 1rem; }
+.card h3 { font-size: 0.95rem; margin: 0 0 1rem; color: #333; border-bottom: 2px solid #f0f0f0; padding-bottom: 0.5rem; }
+.info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f5f5f5; font-size: 0.88rem; }
+.info-row:last-child { border-bottom: none; }
+.info-row .lbl { color: #777; font-weight: 500; }
+.info-row .val { font-weight: 600; color: #222; text-align: right; max-width: 55%; }
+.destino-bar { margin: 0.5rem 0; }
+.destino-bar-label { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 3px; }
+.destino-bar-track { background: #f0f0f0; border-radius: 20px; height: 10px; overflow: hidden; }
+.destino-bar-fill-legal { height: 100%; border-radius: 20px; background: linear-gradient(90deg, #1565C0, #42A5F5); }
+.destino-bar-fill-real { height: 100%; border-radius: 20px; background: linear-gradient(90deg, #C62828, #EF5350); }
+.diff-box { background: #fff3e0; border-left: 4px solid #FF6F00; border-radius: 0 8px 8px 0; padding: 0.8rem; font-size: 0.85rem; color: #E65100; margin: 0.5rem 0; }
+.project-card { border: 2px solid #e0e0e0; border-radius: 10px; padding: 1rem; margin-bottom: 0.8rem; }
+.project-card .proj-title { font-size: 0.92rem; font-weight: 700; color: #222; margin-bottom: 0.4rem; }
+.project-card .proj-meta { font-size: 0.78rem; color: #777; margin-bottom: 0.5rem; }
+.project-card .proj-valor { font-size: 0.88rem; font-weight: 600; color: #1565C0; }
+.progress-bar-mini { background: #e0e0e0; border-radius: 20px; height: 8px; overflow: hidden; margin: 4px 0; }
+.progress-bar-fill { height: 100%; border-radius: 20px; background: linear-gradient(90deg, #2E7D32, #66BB6A); }
+.outcome-item { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid #f5f5f5; }
+.outcome-item:last-child { border-bottom: none; }
+.outcome-icon { font-size: 1rem; flex-shrink: 0; }
+.outcome-indicador { font-size: 0.82rem; font-weight: 600; color: #333; }
+.outcome-vals { font-size: 0.78rem; color: #555; margin-top: 1px; }
+.outcome-vals .meta { color: #1565C0; }
+.outcome-vals .realizado { color: #2E7D32; font-weight: 600; }
+.outcome-vals .realizado.nao { color: #E53935; }
+.aliquota-box { background: #f8f9ff; border-radius: 10px; padding: 1rem; font-size: 0.85rem; line-height: 1.6; color: #333; }
+.legais-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media(max-width:500px){ .legais-compare { grid-template-columns: 1fr; } }
+.compare-col { border-radius: 10px; padding: 1rem; }
+.compare-col.legal { background: #e3f2fd; }
+.compare-col.real { background: #ffebee; }
+.compare-col h4 { margin: 0 0 0.5rem; font-size: 0.85rem; }
+.compare-col .compare-item { display: flex; justify-content: space-between; font-size: 0.8rem; padding: 3px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
+</style>
+
+<a href="/rastreabilidade" style="display:inline-flex;align-items:center;gap:6px;color:#555;text-decoration:none;font-size:0.88rem;margin-bottom:1rem">
+  ← Voltar para Rastreabilidade
+</a>
+
+<div class="tax-hero {{ tax.tipo }}">
+  <div style="font-size:0.82rem;opacity:0.75;margin-bottom:0.3rem">
+    {{ '⚖️ Imposto Direto' if tax.tipo=='direto' else '🛒 Imposto Indireto' if tax.tipo=='indireto' else '🤝 Contribuição Social' if tax.tipo=='contribuicao' else '🎛️ Imposto Regulatório' }}
+    &nbsp;|&nbsp; {{ tax.esfera|capitalize }}
+    {% if tax.progressivo %}&nbsp;|&nbsp; ✅ Progressivo{% endif %}
+    {% if tax.regressivo %}&nbsp;|&nbsp; ⚠️ Regressivo{% endif %}
+  </div>
+  <h1>{{ tax.codigo.replace('_','/') }} — {{ tax.nome }}</h1>
+  <p class="subtitle">{{ tax.nome_completo }} &nbsp;|&nbsp; Arrecada R$ {{ tax.arrecadacao_anual_bi }}bi/ano</p>
+</div>
+
+<div class="grid2">
+  <!-- COLUNA 1 -->
+  <div>
+    <!-- INFO GERAL -->
+    <div class="card">
+      <h3>📋 Informações Gerais</h3>
+      <div class="info-row"><span class="lbl">Código</span><span class="val">{{ tax.codigo.replace('_','/') }}</span></div>
+      <div class="info-row"><span class="lbl">Tipo</span><span class="val">{{ tax.tipo|title }}</span></div>
+      <div class="info-row"><span class="lbl">Esfera</span><span class="val">{{ tax.esfera|title }}</span></div>
+      <div class="info-row"><span class="lbl">Arrecadação anual</span><span class="val" style="color:#1565C0;font-size:1rem">R$ {{ tax.arrecadacao_anual_bi }}bi</span></div>
+      <div class="info-row"><span class="lbl">Base de cálculo</span><span class="val">{{ tax.base_calculo }}</span></div>
+      <div class="info-row"><span class="lbl">Quem paga (formal)</span><span class="val">{{ tax.quem_paga_direto }}</span></div>
+      <div class="info-row"><span class="lbl">Quem paga (real)</span><span class="val" style="color:#C62828">{{ tax.quem_paga_real }}</span></div>
+    </div>
+
+    <!-- ALÍQUOTAS -->
+    <div class="card">
+      <h3>📊 Alíquotas</h3>
+      <div class="aliquota-box">{{ tax.aliquota_info }}</div>
+    </div>
+
+    <!-- DESTINO LEGAL vs REAL -->
+    <div class="card">
+      <h3>🗺️ Destino: Legal vs. Real</h3>
+      <div class="legais-compare">
+        <div class="compare-col legal">
+          <h4>📜 Destino Legal (CF/lei)</h4>
+          {% for dest, pct in tax.destino_legal.items() %}
+          <div class="compare-item">
+            <span>{{ dest }}</span>
+            <strong>{{ pct }}%</strong>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="compare-col real">
+          <h4>📍 Destino Real (executado)</h4>
+          {% for dest, pct in tax.destino_real.items() %}
+          <div class="compare-item">
+            <span>{{ dest }}</span>
+            <strong>{{ pct }}%</strong>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% if tax.destino_legal != tax.destino_real %}
+      <div class="diff-box">
+        ⚠️ Há diferença entre o destino legal e o real. Isso pode indicar remanejamentos orçamentários, contingenciamentos ou desvios de finalidade — todos devem ser justificados pelo governo e fiscalizados pelo TCU.
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- COMO FISCALIZAR -->
+    <div class="card">
+      <h3>🔍 Como Fiscalizar</h3>
+      <p style="font-size:0.88rem;color:#444;line-height:1.6">{{ tax.como_fiscalizar }}</p>
+    </div>
+  </div>
+
+  <!-- COLUNA 2 -->
+  <div>
+    <!-- EXPLICAÇÃO CIDADÃ -->
+    <div class="card" style="border-left:4px solid #FFD600">
+      <h3>💬 O que isso significa para você</h3>
+      <p style="font-size:0.9rem;color:#333;line-height:1.6">{{ tax.explicacao_cidada }}</p>
+    </div>
+
+    <!-- PROJETOS FINANCIADOS -->
+    <div class="card">
+      <h3>🏗️ Projetos financiados por este imposto</h3>
+      {% if links %}
+        {% for link in links %}
+        <div class="project-card">
+          <div class="proj-title">{{ link.title }}</div>
+          <div class="proj-meta">
+            {{ link.exercicio }} &nbsp;|&nbsp; {{ link.responsible }} &nbsp;|&nbsp;
+            <strong style="color:#1565C0">R$ {{ link.valor_bi }}bi alocados ({{ link.pct_alocado }}%)</strong>
+          </div>
+          {% if link.nota %}
+          <div style="font-size:0.78rem;color:#555;margin-bottom:0.4rem;font-style:italic">📎 {{ link.nota }}</div>
+          {% endif %}
+          <div class="proj-valor">Progresso do projeto:</div>
+          <div class="progress-bar-mini">
+            <div class="progress-bar-fill" style="width:{{ link.progress_pct }}%"></div>
+          </div>
+          <div style="font-size:0.75rem;color:#777;margin-bottom:0.5rem">{{ link.progress_pct }}% concluído &nbsp;|&nbsp; Budget total: R$ {{ link.budget_bi }}bi</div>
+
+          <!-- RESULTADOS DO PROJETO -->
+          {% if outcomes[link.project_id] %}
+          <div style="background:#f9f9f9;border-radius:8px;padding:0.6rem;margin-top:0.4rem">
+            <div style="font-size:0.72rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">📈 Resultados alcançados</div>
+            {% for o in outcomes[link.project_id] %}
+            <div class="outcome-item">
+              <span class="outcome-icon">{{ '✅' if o.status=='atingido' else '🔄' if o.status=='em_execucao' else '🔴' if o.status=='nao_iniciado' else '⚠️' }}</span>
+              <div>
+                <div class="outcome-indicador">{{ o.indicador }}</div>
+                <div class="outcome-vals">
+                  Meta: <span class="meta">{{ o.meta }}</span> &nbsp;|&nbsp;
+                  Real: <span class="realizado {{ '' if o.positivo else 'nao' }}">{{ o.realizado }}</span>
+                  {% if o.fonte %}<span style="color:#999"> ({{ o.fonte }})</span>{% endif %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <p style="color:#999;font-size:0.88rem">Nenhum projeto mapeado para este imposto ainda.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
