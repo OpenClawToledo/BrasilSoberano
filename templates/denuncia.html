@@ -51,25 +51,53 @@
 
 <!-- DENÚNCIAS REGISTRADAS -->
 <h3 style="margin-bottom:16px">📋 Denúncias registradas ({{ violations|length }})</h3>
+
+<style>
+.lc-mini { display:flex; gap:4px; align-items:center; flex-wrap:wrap; margin:6px 0; }
+.lc-mini-step { font-size:0.68rem; padding:2px 8px; border-radius:12px; background:#f5f5f5; color:#999; white-space:nowrap; }
+.lc-mini-step.done { background:#e8f5e9; color:#2E7D32; font-weight:600; }
+.lc-mini-step.active { background:#1565C0; color:white; font-weight:700; }
+.lc-mini-arrow { color:#ccc; font-size:0.7rem; }
+</style>
+
 {% for v in violations %}
-{% set status_colors = {'recebida':'#9E9E9E','investigando':'#FB8C00','resolvida':'#43A047','arquivada':'#757575'} %}
-{% set sc = status_colors.get(v.status,'#9E9E9E') %}
-<div class="card" style="border-left:4px solid {{ sc }};margin-bottom:12px">
+<div class="card" style="border-left:4px solid {{ v.stage_info.color }};margin-bottom:12px">
   <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
     <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:{{ sc }}20;color:{{ sc }};font-weight:700">{{ v.status|capitalize }}</span>
+      <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;font-weight:700;background:{{ v.stage_info.color }}20;color:{{ v.stage_info.color }}">{{ v.stage_info.label }}</span>
       <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:#FFEBEE;color:var(--red);font-weight:600">{{ v.article_number }}</span>
       <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:#F5F5F5">{{ levels.get(v.level,v.level) }}{% if v.location %} · {{ v.location }}{% endif %}</span>
     </div>
     <span style="font-size:0.75rem;color:var(--text-light)">{{ v.created_at[:10] }}</span>
   </div>
-  <p style="font-size:0.95rem;margin-bottom:8px">{{ v.description }}</p>
+
+  <!-- MINI LIFECYCLE TRACK -->
+  <div class="lc-mini">
+    {% for key, stage in lifecycle_stages.items() %}
+    {% if not loop.first %}<span class="lc-mini-arrow">→</span>{% endif %}
+    <span class="lc-mini-step
+      {% if v.lifecycle_status == key %}active
+      {% elif lifecycle_stages.keys()|list.index(key) < lifecycle_stages.keys()|list.index(v.lifecycle_status) %}done
+      {% endif %}">{{ stage.label.split(' ',1)[1] if ' ' in stage.label else stage.label }}</span>
+    {% endfor %}
+  </div>
+
+  <p style="font-size:0.92rem;margin-bottom:8px">{{ v.description[:160] }}{% if v.description|length > 160 %}...{% endif %}</p>
+  {% if v.processo_numero %}<p style="font-size:0.8rem;color:#F4511E">⚖️ Processo: {{ v.processo_numero }}</p>{% endif %}
+  {% if v.pl_numero %}<p style="font-size:0.8rem;color:#8E24AA">📋 PL: {{ v.pl_numero }}</p>{% endif %}
   {% if v.evidence %}<p style="font-size:0.8rem;color:var(--blue)">📎 {{ v.evidence }}</p>{% endif %}
-  <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
+  {% if v.documentos %}<p style="font-size:0.75rem;color:#777">📁 {{ v.documentos|length }} documento(s) anexado(s)</p>{% endif %}
+
+  <div style="display:flex;align-items:center;gap:12px;margin-top:8px;flex-wrap:wrap">
     <button onclick="apoiarDenuncia({{ v.id }},this)" class="btn btn-outline" style="padding:6px 12px;font-size:0.85rem">
       🤝 Apoiar (<span id="sup-{{ v.id }}">{{ v.support_count }}</span>)
     </button>
-    <span style="font-size:0.8rem;color:var(--text-light)">cidadãos confirmam este descumprimento</span>
+    <a href="/denuncia/{{ v.id }}" style="font-size:0.85rem;color:#1565C0;font-weight:600;text-decoration:none">
+      📋 Ver ciclo completo →
+    </a>
+    {% if v.votes_approve or v.votes_reject %}
+    <span style="font-size:0.75rem;color:#777">✅ {{ v.votes_approve or 0 }} | ❌ {{ v.votes_reject or 0 }}</span>
+    {% endif %}
   </div>
 </div>
 {% endfor %}

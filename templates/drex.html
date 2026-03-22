@@ -1,0 +1,324 @@
+{% extends 'base.html' %}
+{% block title %}Gestor DREX — Soberania Financeira{% endblock %}
+{% block content %}
+<style>
+.drex-hero { background: linear-gradient(135deg, #1565C0 0%, #0D47A1 50%, #2E7D32 100%); color: white; padding: 2rem; border-radius: 16px; margin-bottom: 2rem; text-align: center; }
+.drex-hero h1 { font-size: 2rem; margin: 0 0 0.5rem; }
+.drex-hero p { opacity: 0.85; margin: 0; font-size: 1rem; }
+.drex-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+@media(max-width:768px){ .drex-grid { grid-template-columns: 1fr; } }
+.drex-card { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+.drex-card h3 { color: #1565C0; margin: 0 0 1rem; font-size: 1rem; }
+.form-row { margin-bottom: 1rem; }
+.form-row label { display: block; font-size: 0.85rem; color: #555; margin-bottom: 4px; font-weight: 600; }
+.form-row input, .form-row select { width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem; box-sizing: border-box; transition: border-color 0.2s; }
+.form-row input:focus, .form-row select:focus { border-color: #1565C0; outline: none; }
+.btn-calcular { width: 100%; background: linear-gradient(135deg, #1565C0, #2E7D32); color: white; border: none; padding: 14px; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; letter-spacing: 0.5px; }
+.btn-calcular:hover { opacity: 0.92; }
+.resultado-box { display: none; background: #f8f9ff; border: 2px solid #1565C0; border-radius: 12px; padding: 1.5rem; margin-top: 1rem; }
+.resultado-box.show { display: block; }
+.valor-linha { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #e8eaf6; }
+.valor-linha:last-child { border-bottom: none; }
+.valor-linha .label { font-size: 0.9rem; color: #555; }
+.valor-linha .valor { font-weight: 700; color: #1565C0; }
+.valor-linha.destaque { background: #fff3e0; margin: 4px -8px; padding: 10px 8px; border-radius: 8px; border: none; }
+.valor-linha.destaque .label { color: #e65100; font-weight: 600; }
+.valor-linha.destaque .valor { color: #e65100; font-size: 1.1rem; }
+.carga-barra { margin: 1rem 0; }
+.carga-barra-label { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 0.8rem; }
+.carga-barra-track { background: #e8eaf6; border-radius: 20px; height: 12px; overflow: hidden; }
+.carga-barra-fill { height: 100%; background: linear-gradient(90deg, #2E7D32, #FFD600, #C62828); border-radius: 20px; transition: width 0.5s; }
+.setor-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+.setor-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.setor-name { flex: 1; font-size: 0.85rem; }
+.setor-val { font-weight: 700; font-size: 0.85rem; color: #C62828; }
+.estado-card { background: white; border-radius: 12px; padding: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); cursor: pointer; border: 2px solid transparent; transition: all 0.2s; }
+.estado-card:hover { border-color: #1565C0; transform: translateY(-2px); }
+.estado-card .code { font-size: 1.2rem; font-weight: 800; color: #1565C0; }
+.estado-card .name { font-size: 0.8rem; color: #777; }
+.estado-card .hdi { font-size: 0.75rem; margin-top: 4px; }
+.estados-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+.coop-box { background: linear-gradient(135deg, #2E7D32, #43A047); color: white; border-radius: 12px; padding: 1rem; text-align: center; margin-top: 1rem; }
+.coop-box h4 { margin: 0 0 0.5rem; font-size: 0.9rem; }
+.coop-box .coop-val { font-size: 1.8rem; font-weight: 800; }
+.coop-box small { opacity: 0.85; font-size: 0.75rem; }
+.aloc-slider-row { margin-bottom: 0.8rem; }
+.aloc-slider-row label { display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 2px; }
+.aloc-slider-row label span { color: #1565C0; font-weight: 700; }
+.aloc-slider-row input[type=range] { width: 100%; accent-color: #1565C0; }
+.coletivo-box { background: #e8f5e9; border-left: 4px solid #2E7D32; border-radius: 0 8px 8px 0; padding: 1rem; margin-top: 1rem; }
+.coletivo-box h4 { color: #1B5E20; margin: 0 0 0.5rem; font-size: 0.9rem; }
+.participantes-badge { display: inline-block; background: #1565C0; color: white; border-radius: 20px; padding: 2px 10px; font-size: 0.75rem; font-weight: 700; }
+.tab-btn { padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 600; background: #e8eaf6; color: #555; transition: all 0.2s; }
+.tab-btn.active { background: #1565C0; color: white; }
+</style>
+
+<div class="drex-hero">
+  <h1>💳 Gestor Financeiro DREX</h1>
+  <p>Soberania financeira começa com clareza.<br>Veja onde cada real do seu salário vai — e como você quer que o estado gerencie a sua parte.</p>
+</div>
+
+<div class="drex-grid">
+  <!-- COLUNA 1: CALCULADORA -->
+  <div>
+    <div class="drex-card">
+      <h3>🧮 Calculadora do Contribuinte</h3>
+      <div class="form-row">
+        <label>Salário bruto mensal (R$)</label>
+        <input type="number" id="renda" placeholder="Ex: 4500" min="1000" step="100">
+      </div>
+      <div class="form-row">
+        <label>Estado onde trabalha</label>
+        <select id="estado_sel">
+          {% for s in states_list %}
+          <option value="{{ s.code }}">{{ s.code }} — {{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="btn-calcular" onclick="calcular()">📊 Calcular minha carga tributária</button>
+
+      <div class="resultado-box" id="resultado">
+        <div class="valor-linha">
+          <span class="label">💰 Salário Bruto</span>
+          <span class="valor" id="r-bruto">—</span>
+        </div>
+        <div class="valor-linha">
+          <span class="label">📋 IRPF (Imposto de Renda)</span>
+          <span class="valor" id="r-irpf" style="color:#C62828">—</span>
+        </div>
+        <div class="valor-linha">
+          <span class="label">🏥 INSS (Previdência)</span>
+          <span class="valor" id="r-inss" style="color:#C62828">—</span>
+        </div>
+        <div class="valor-linha">
+          <span class="label">🛒 Impostos no Consumo (ICMS/PIS/COFINS)</span>
+          <span class="valor" id="r-consumo" style="color:#C62828">—</span>
+        </div>
+        <div class="valor-linha destaque">
+          <span class="label">🔴 TOTAL de Impostos / mês</span>
+          <span class="valor" id="r-total">—</span>
+        </div>
+        <div class="valor-linha">
+          <span class="label">💚 Salário Líquido Real</span>
+          <span class="valor" id="r-liquido" style="color:#2E7D32">—</span>
+        </div>
+
+        <div class="carga-barra">
+          <div class="carga-barra-label">
+            <span>Carga tributária efetiva</span>
+            <strong id="r-carga">0%</strong>
+          </div>
+          <div class="carga-barra-track">
+            <div class="carga-barra-fill" id="barra-carga" style="width:0%"></div>
+          </div>
+        </div>
+
+        <div class="coop-box" id="coop-box" style="display:none">
+          <h4>🤝 Sua contribuição ao fundo nacional de cooperativismo</h4>
+          <div class="coop-val" id="r-coop">R$ 0</div>
+          <small id="coop-desc">% da sua renda vai para o fundo cooperativo nacional</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- DISTRIBUIÇÃO DOS IMPOSTOS -->
+    <div class="drex-card" id="card-distribuicao" style="display:none;margin-top:1rem;">
+      <h3>📊 Para onde vai cada real do seu imposto</h3>
+      <div id="distribuicao-lista"></div>
+      <p style="font-size:0.78rem;color:#999;margin-top:0.5rem">Estimativa baseada na execução orçamentária federal. Valores aproximados.</p>
+    </div>
+  </div>
+
+  <!-- COLUNA 2: ALOCAÇÃO CIDADÃ + ESTADOS -->
+  <div>
+    <!-- ALOCAÇÃO DESEJADA -->
+    <div class="drex-card">
+      <h3>🗳️ Como você quer que seu imposto seja usado?</h3>
+      <p style="font-size:0.82rem;color:#777;margin-bottom:1rem">Distribua 100% entre os setores. O resultado coletivo é publicado como proposta orçamentária cidadã.</p>
+      <div id="aloc-sliders">
+        {% for s in orcamento_setores %}
+        <div class="aloc-slider-row">
+          <label>
+            {{ s.setor }}
+            <span id="aloc-pct-{{ loop.index0 }}">{{ ((s.atual / 2000 * 100)|round(0))|int }}%</span>
+          </label>
+          <input type="range" min="0" max="40" value="{{ ((s.atual / 2000 * 100)|round(0))|int }}"
+                 id="aloc-{{ loop.index0 }}" data-setor="{{ s.setor }}"
+                 oninput="atualizarSlider({{ loop.index0 }})">
+        </div>
+        {% endfor %}
+      </div>
+      <button class="btn-calcular" style="background:#2E7D32;margin-top:0.5rem" onclick="salvarAlocacao()">
+        🗳️ Votar nessa distribuição
+      </button>
+      <div id="aloc-resultado" style="display:none;background:#e8f5e9;border-radius:8px;padding:0.8rem;margin-top:0.8rem;font-size:0.85rem;color:#1B5E20;font-weight:600;text-align:center"></div>
+    </div>
+
+    <!-- PERFIL DO ESTADO -->
+    <div class="drex-card" style="margin-top:1rem">
+      <h3>🗺️ Perfil Econômico por Estado</h3>
+      <p style="font-size:0.82rem;color:#777;margin-bottom:1rem">Cada estado opera com cooperativismo: controla seus setores estratégicos e contribui com um percentual ao fundo nacional.</p>
+      <div class="estados-grid">
+        {% for s in states_list %}
+        <div class="estado-card" onclick="verEstado('{{ s.code }}')">
+          <div class="code">{{ s.code }}</div>
+          <div class="name">{{ s.name[:8] }}</div>
+          <div class="hdi">IDH {{ '%.3f'|format(s.hdi) }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- MODAL ESTADO -->
+    <div id="estado-modal" style="display:none;background:white;border-radius:12px;padding:1.5rem;margin-top:1rem;border:2px solid #1565C0">
+      <div id="estado-modal-content"></div>
+    </div>
+
+    <!-- DADOS COLETIVOS -->
+    {% if alocacao_media %}
+    <div class="drex-card" style="margin-top:1rem">
+      <h3>🌐 Alocação Coletiva da Plataforma</h3>
+      <p style="font-size:0.82rem;color:#777">Média de como todos os participantes querem distribuir o orçamento:</p>
+      {% for setor, pct in alocacao_media.items() %}
+      <div class="valor-linha">
+        <span class="label">{{ setor }}</span>
+        <span class="valor">{{ pct }}%</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+const CORES_SETOR = {
+  'Previdência (INSS)': '#8E24AA',
+  'Saúde (SUS)': '#E53935',
+  'Educação': '#1E88E5',
+  'Juros da Dívida': '#757575',
+  'Segurança Pública': '#F4511E',
+  'Infraestrutura': '#43A047',
+  'Outros': '#FFB300',
+};
+
+function fmt(v) {
+  return 'R$ ' + parseFloat(v).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+async function calcular() {
+  const renda = parseFloat(document.getElementById('renda').value);
+  const estado = document.getElementById('estado_sel').value;
+  if (!renda || renda < 100) { alert('Informe um salário válido.'); return; }
+
+  // Coleta alocação
+  const alocacao = {};
+  document.querySelectorAll('[id^="aloc-"][type="range"]').forEach(el => {
+    alocacao[el.dataset.setor] = el.value;
+  });
+
+  const res = await fetch('/drex/calcular', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({renda, estado, alocacao})
+  });
+  const d = await res.json();
+  if (d.error) { alert(d.error); return; }
+
+  document.getElementById('r-bruto').textContent = fmt(d.renda);
+  document.getElementById('r-irpf').textContent = fmt(d.irpf);
+  document.getElementById('r-inss').textContent = fmt(d.inss);
+  document.getElementById('r-consumo').textContent = fmt(d.impostos_consumo);
+  document.getElementById('r-total').textContent = fmt(d.total_impostos);
+  document.getElementById('r-liquido').textContent = fmt(d.renda_liquida);
+  document.getElementById('r-carga').textContent = d.carga_pct + '%';
+  document.getElementById('barra-carga').style.width = Math.min(d.carga_pct, 100) + '%';
+
+  // Cooperativismo
+  if (d.cooperativismo_valor > 0) {
+    document.getElementById('r-coop').textContent = fmt(d.cooperativismo_valor);
+    document.getElementById('coop-desc').textContent = d.cooperativismo_fed_pct + '% da sua renda vai ao fundo cooperativo de ' + estado;
+    document.getElementById('coop-box').style.display = 'block';
+  }
+
+  // Distribuição
+  const lista = document.getElementById('distribuicao-lista');
+  lista.innerHTML = '';
+  for (const [setor, val] of Object.entries(d.distribuicao)) {
+    const pct = ((val / d.total_impostos) * 100).toFixed(1);
+    const cor = CORES_SETOR[setor] || '#1565C0';
+    lista.innerHTML += `<div class="setor-item">
+      <div class="setor-dot" style="background:${cor}"></div>
+      <span class="setor-name">${setor}</span>
+      <span class="setor-val">${fmt(val)} <small style="color:#999">(${pct}%)</small></span>
+    </div>`;
+  }
+
+  document.getElementById('resultado').classList.add('show');
+  document.getElementById('card-distribuicao').style.display = 'block';
+
+  // Dados coletivos
+  if (d.coletivo && d.coletivo.participantes > 0) {
+    let cBox = document.getElementById('coletivo-live');
+    if (!cBox) {
+      cBox = document.createElement('div');
+      cBox.id = 'coletivo-live';
+      cBox.className = 'coletivo-box';
+      document.getElementById('resultado').appendChild(cBox);
+    }
+    cBox.innerHTML = `<h4>🌐 Dados coletivos — ${estado}</h4>
+      <span class="participantes-badge">${d.coletivo.participantes} participantes</span>
+      <div style="margin-top:0.5rem;font-size:0.85rem">
+        Renda média: <strong>${fmt(d.coletivo.avg_renda)}</strong> &nbsp;|&nbsp;
+        Imposto médio: <strong>${fmt(d.coletivo.avg_impostos)}</strong>
+      </div>`;
+  }
+}
+
+function atualizarSlider(idx) {
+  const val = document.getElementById('aloc-' + idx).value;
+  document.getElementById('aloc-pct-' + idx).textContent = val + '%';
+}
+
+async function salvarAlocacao() {
+  const renda = parseFloat(document.getElementById('renda').value) || 3000;
+  const estado = document.getElementById('estado_sel').value;
+  const alocacao = {};
+  document.querySelectorAll('[id^="aloc-"][type="range"]').forEach(el => {
+    alocacao[el.dataset.setor] = el.value;
+  });
+  const res = await fetch('/drex/calcular', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({renda, estado, alocacao})
+  });
+  const d = await res.json();
+  const box = document.getElementById('aloc-resultado');
+  box.style.display = 'block';
+  box.textContent = '✅ Voto registrado! ' + (d.coletivo ? d.coletivo.participantes + ' participantes neste estado.' : '');
+}
+
+async function verEstado(code) {
+  const res = await fetch('/drex/estado/' + code);
+  const d = await res.json();
+  const modal = document.getElementById('estado-modal');
+  const setores = Array.isArray(d.setores_principais) ? d.setores_principais.join(', ') : d.setores_principais;
+  modal.style.display = 'block';
+  document.getElementById('estado-modal-content').innerHTML = `
+    <h3 style="color:#1565C0;margin:0 0 1rem">🗺️ ${d.name} (${d.code})</h3>
+    <div class="valor-linha"><span class="label">PIB</span><span class="valor">R$ ${d.pib_bi} bilhões</span></div>
+    <div class="valor-linha"><span class="label">IDH</span><span class="valor">${d.hdi}</span></div>
+    <div class="valor-linha"><span class="label">Custo de vida</span><span class="valor">${d.custo_vida_mult}x a média nacional</span></div>
+    <div class="valor-linha"><span class="label">Salário médio</span><span class="valor">${fmt(d.salario_medio)}</span></div>
+    <div class="valor-linha"><span class="label">Desemprego</span><span class="valor">${d.desemprego_pct}%</span></div>
+    <div class="valor-linha"><span class="label">Gini</span><span class="valor">${d.gini} <small>(0=igualdade perfeita, 1=desigualdade total)</small></span></div>
+    <div class="valor-linha"><span class="label">Setores principais</span><span class="valor" style="font-size:0.85rem">${setores}</span></div>
+    <div class="valor-linha"><span class="label">Contribuição ao fundo nacional</span><span class="valor">${d.cooperativismo_fed_pct}% do PIB estadual</span></div>
+    <div class="valor-linha"><span class="label">Participantes na plataforma</span><span class="valor">${d.participantes || 0}</span></div>
+    <div style="background:#e8f5e9;border-radius:8px;padding:0.8rem;margin-top:0.8rem;font-size:0.82rem;color:#1B5E20">
+      🤝 <strong>Cooperativismo:</strong> O ${d.name} controla 100% dos setores de energia, água e transporte dentro do estado, mas contribui com ${d.cooperativismo_fed_pct}% do PIB estadual para o Fundo Nacional de Cooperação — que redistribui para estados com maior vulnerabilidade social.
+    </div>
+    <button onclick="document.getElementById('estado-modal').style.display='none'" style="margin-top:0.8rem;background:#f0f0f0;border:none;border-radius:8px;padding:8px 16px;cursor:pointer">Fechar</button>
+  `;
+  modal.scrollIntoView({behavior:'smooth'});
+}
+</script>
+{% endblock %}

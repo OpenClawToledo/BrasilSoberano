@@ -1,57 +1,197 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% block title %}Feed — Brasil Soberano{% endblock %}
-{% block header %}
-<div class="page-header">
-  <h1>📰 Feed de Notícias</h1>
-  <p>O que está acontecendo no Brasil — filtrado pelo seu nível geográfico.</p>
-</div>
-{% endblock %}
 {% block content %}
-<form class="filters" method="get">
-  <select name="level" onchange="this.form.submit()">
-    <option value="">Todos os níveis</option>
-    <option value="bairro" {% if level=='bairro' %}selected{% endif %}>🏘️ Bairro</option>
-    <option value="cidade" {% if level=='cidade' %}selected{% endif %}>🏙️ Cidade</option>
-    <option value="estado" {% if level=='estado' %}selected{% endif %}>🗺️ Estado</option>
-    <option value="federal" {% if level=='federal' %}selected{% endif %}>🇧🇷 Federal</option>
-    <option value="reserva" {% if level=='reserva' %}selected{% endif %}>🌿 Reserva</option>
-  </select>
-  <select name="state" onchange="this.form.submit()">
-    <option value="">Todos os estados</option>
-    {% for s in states_list %}<option value="{{ s.state }}" {% if state==s.state %}selected{% endif %}>{{ s.state }}</option>{% endfor %}
-  </select>
-  <select name="category" onchange="this.form.submit()">
-    <option value="">Todas as categorias</option>
-    {% for c in cats %}<option value="{{ c.category }}" {% if category==c.category %}selected{% endif %}>{{ c.category }}</option>{% endfor %}
-  </select>
-  {% if level or state or category %}<a href="/feed" class="btn btn-outline">Limpar</a>{% endif %}
-</form>
+<style>
+.feed-header { background: linear-gradient(135deg, #1565C0, #283593); color: white; padding: 1.5rem; border-radius: 14px; margin-bottom: 1.5rem; }
+.feed-header h1 { margin: 0 0 0.3rem; font-size: 1.5rem; }
+.feed-header p { margin: 0; opacity: 0.85; font-size: 0.9rem; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.filter-btn { padding: 6px 14px; border-radius: 20px; border: 2px solid #e0e0e0; background: white; font-size: 0.82rem; cursor: pointer; text-decoration: none; color: #555; transition: all 0.2s; }
+.filter-btn:hover, .filter-btn.active { border-color: #1565C0; background: #1565C0; color: white; }
+.feed-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+.feed-card { background: white; border-radius: 12px; padding: 1.2rem; box-shadow: 0 2px 10px rgba(0,0,0,0.06); border-left: 4px solid #e0e0e0; transition: box-shadow 0.2s; }
+.feed-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
+.feed-card.infra { border-color: #43A047; }
+.feed-card.saude { border-color: #E53935; }
+.feed-card.educacao { border-color: #1E88E5; }
+.feed-card.constituicao { border-color: #8E24AA; }
+.feed-card.economia { border-color: #FFB300; }
+.feed-card.meio_ambiente { border-color: #00897B; }
+.feed-card.geral { border-color: #78909C; }
+.feed-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; }
+.feed-title { font-size: 0.95rem; font-weight: 700; color: #222; line-height: 1.3; flex: 1; }
+.feed-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 0.6rem; align-items: center; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.72rem; font-weight: 600; background: #e8eaf6; color: #3949AB; }
+.badge.federal { background: #e3f2fd; color: #1565C0; }
+.badge.estado { background: #f3e5f5; color: #7B1FA2; }
+.badge.cidade { background: #e8f5e9; color: #2E7D32; }
+.badge.bairro { background: #fff8e1; color: #F57F17; }
+.badge.reserva { background: #f1f8e9; color: #558B2F; }
+.feed-summary { font-size: 0.88rem; color: #555; line-height: 1.5; margin-bottom: 0.8rem; }
+.feed-hora { font-size: 0.75rem; color: #999; }
+.envolvidos-section { background: #f5f5f5; border-radius: 8px; padding: 0.6rem 0.8rem; margin-bottom: 0.6rem; }
+.envolvidos-label { font-size: 0.72rem; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.envolvidos-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.envolvido-tag { background: white; border: 1px solid #ddd; border-radius: 12px; padding: 2px 8px; font-size: 0.75rem; color: #444; }
+.eventos-section { margin-top: 0.6rem; }
+.eventos-label { font-size: 0.72rem; font-weight: 700; color: #1565C0; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.evento-item { display: flex; gap: 8px; align-items: flex-start; padding: 4px 0; border-bottom: 1px solid #f0f0f0; }
+.evento-item:last-child { border-bottom: none; }
+.evento-num { background: #1565C0; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 0.68rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+.evento-text { font-size: 0.82rem; color: #444; line-height: 1.4; }
+.toggle-btn { background: none; border: none; color: #1565C0; font-size: 0.78rem; cursor: pointer; padding: 4px 0; font-weight: 600; }
+.source-badge { display: inline-block; background: #f5f5f5; border-radius: 6px; padding: 2px 8px; font-size: 0.72rem; color: #777; }
+/* Secções laterais */
+.sidebar { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; }
+@media(max-width:768px){ .sidebar { grid-template-columns: 1fr; } }
+.side-card { background: white; border-radius: 12px; padding: 1.2rem; box-shadow: 0 2px 10px rgba(0,0,0,0.06); margin-bottom: 1rem; }
+.side-card h3 { font-size: 0.95rem; margin: 0 0 1rem; color: #333; border-bottom: 2px solid #f0f0f0; padding-bottom: 0.5rem; }
+.sim-item { padding: 8px 0; border-bottom: 1px solid #f5f5f5; cursor: pointer; }
+.sim-item:last-child { border-bottom: none; }
+.sim-item-title { font-size: 0.85rem; font-weight: 600; color: #222; }
+.sim-item-year { font-size: 0.75rem; color: #999; }
+.sim-item-context { font-size: 0.8rem; color: #666; display: none; margin-top: 4px; }
+.sim-item.open .sim-item-context { display: block; }
+.violation-item { padding: 8px 0; border-bottom: 1px solid #f5f5f5; }
+.violation-item:last-child { border-bottom: none; }
+.violation-art { font-size: 0.72rem; font-weight: 700; color: #C62828; }
+.violation-desc { font-size: 0.82rem; color: #444; }
+.violation-status { font-size: 0.72rem; color: #777; }
+</style>
 
-{% set cat_icons = {'infraestrutura':'🏗️','educacao':'🎓','saude':'🏥','constituicao':'⚖️','economia':'💰','meio_ambiente':'🌳','geral':'📋'} %}
-{% set level_colors = {'bairro':'#43A047','cidade':'#1E88E5','estado':'#8E24AA','federal':'#C62828','reserva':'#2E7D32'} %}
+<div class="feed-header">
+  <h1>📰 Feed Soberano</h1>
+  <p>Notícias com contexto — hora do ocorrido, quem está envolvido e o que acontece em seguida.</p>
+</div>
 
-{% for item in items %}
-{% set lc = level_colors.get(item.level,'#9E9E9E') %}
-<div class="card" style="border-left:5px solid {{ lc }};margin-bottom:16px">
-  <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
-    <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:{{ lc }}15;color:{{ lc }};font-weight:700">
-        {% if item.level=='bairro' %}🏘️{% elif item.level=='cidade' %}🏙️{% elif item.level=='estado' %}🗺️{% elif item.level=='federal' %}🇧🇷{% else %}🌿{% endif %}
-        {{ item.level|capitalize }}{% if item.state %} · {{ item.state }}{% endif %}{% if item.city %} · {{ item.city }}{% endif %}
-      </span>
-      <span style="font-size:0.75rem;padding:3px 10px;border-radius:12px;background:#F5F5F5">{{ cat_icons.get(item.category,'📋') }} {{ item.category }}</span>
+<!-- FILTROS -->
+<div class="filters">
+  <a href="/feed" class="filter-btn {% if not level and not category %}active{% endif %}">Todos</a>
+  <a href="/feed?level=federal" class="filter-btn {% if level=='federal' %}active{% endif %}">🇧🇷 Federal</a>
+  <a href="/feed?level=estado" class="filter-btn {% if level=='estado' %}active{% endif %}">🗺️ Estado</a>
+  <a href="/feed?level=cidade" class="filter-btn {% if level=='cidade' %}active{% endif %}">🏙️ Cidade</a>
+  <a href="/feed?level=bairro" class="filter-btn {% if level=='bairro' %}active{% endif %}">🏘️ Bairro</a>
+  <a href="/feed?level=reserva" class="filter-btn {% if level=='reserva' %}active{% endif %}">🌿 Reserva</a>
+  <span style="border-left:1px solid #e0e0e0;margin:0 4px"></span>
+  {% for cat in cats %}
+  <a href="/feed?category={{ cat.category }}" class="filter-btn {% if category==cat.category %}active{% endif %}">{{ cat.category }}</a>
+  {% endfor %}
+</div>
+
+<div class="sidebar">
+  <!-- FEED PRINCIPAL -->
+  <div>
+    <div class="feed-grid">
+      {% for item in items %}
+      <div class="feed-card {{ item.category }}">
+        <div class="feed-card-header">
+          <div class="feed-title">{{ item.title }}</div>
+        </div>
+        <div class="feed-meta">
+          <span class="badge {{ item.level }}">
+            {% if item.level=='federal' %}🇧🇷
+            {% elif item.level=='estado' %}🗺️
+            {% elif item.level=='cidade' %}🏙️
+            {% elif item.level=='bairro' %}🏘️
+            {% elif item.level=='reserva' %}🌿
+            {% endif %}
+            {{ item.level|title }}
+          </span>
+          {% if item.state %}<span class="badge">{{ item.state }}</span>{% endif %}
+          {% if item.city %}<span class="badge">{{ item.city }}</span>{% endif %}
+          {% if item.hora_local %}
+          <span class="feed-hora">🕐 {{ item.hora_local }}</span>
+          {% endif %}
+          {% if item.source %}<span class="source-badge">📌 {{ item.source }}</span>{% endif %}
+        </div>
+
+        <div class="feed-summary">{{ item.summary }}</div>
+
+        <!-- ENVOLVIDOS -->
+        {% if item.envolvidos %}
+        <div class="envolvidos-section">
+          <div class="envolvidos-label">👥 Envolvidos</div>
+          <div class="envolvidos-list">
+            {% for env in item.envolvidos %}
+            <span class="envolvido-tag">{{ env }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- CADEIA DE EVENTOS INERENTES -->
+        {% if item.eventos_inerentes %}
+        <div class="eventos-section">
+          <div class="eventos-label">⛓️ Eventos esperados</div>
+          {% for ev in item.eventos_inerentes %}
+          <div class="evento-item">
+            <div class="evento-num">{{ loop.index }}</div>
+            <div class="evento-text">{{ ev }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      {% if not items %}
+      <div style="text-align:center;padding:3rem;color:#999">
+        <div style="font-size:3rem">📭</div>
+        <p>Nenhuma notícia encontrada para este filtro.</p>
+        <a href="/feed" class="filter-btn active">Ver todas</a>
+      </div>
+      {% endif %}
     </div>
-    <span style="font-size:0.75rem;color:var(--text-light)">{{ item.created_at[:10] }}</span>
   </div>
-  <h3 style="margin:0 0 8px;font-size:1.05rem">{{ item.title }}</h3>
-  <p style="color:var(--text-light);font-size:0.9rem">{{ item.summary }}</p>
-  {% if item.source %}<p style="font-size:0.8rem;color:var(--text-light);margin-top:8px">📌 Fonte: {{ item.source }}</p>{% endif %}
+
+  <!-- SIDEBAR DIREITA -->
+  <div>
+    <!-- CENÁRIOS DO SIMULADOR -->
+    {% if sim_items %}
+    <div class="side-card">
+      <h3>🎯 Do Simulador</h3>
+      {% for sc in sim_items %}
+      <div class="sim-item" onclick="this.classList.toggle('open')">
+        <div class="sim-item-title">{{ sc.title }}</div>
+        <div class="sim-item-year">📅 {{ sc.year }}</div>
+        <div class="sim-item-context">{{ sc.context[:120] }}... <a href="/simulador" style="color:#1565C0">Ver cenário →</a></div>
+      </div>
+      {% endfor %}
+      <a href="/simulador" style="display:block;text-align:center;font-size:0.82rem;color:#1565C0;margin-top:0.8rem;font-weight:600">Ver todos os cenários →</a>
+    </div>
+    {% endif %}
+
+    <!-- DENÚNCIAS ATIVAS -->
+    {% if active_violations %}
+    <div class="side-card">
+      <h3>🚨 Denúncias em tramitação</h3>
+      {% for v in active_violations %}
+      <div class="violation-item">
+        <div class="violation-art">Art. {{ v.article_number }}</div>
+        <div class="violation-desc">{{ v.description[:80] }}{% if v.description|length > 80 %}...{% endif %}</div>
+        <div class="violation-status">
+          📍 {{ v.level }} &nbsp;|&nbsp;
+          {% if v.lifecycle_status == 'recebida' %}📥 Recebida
+          {% elif v.lifecycle_status == 'analisada' %}🔍 Em análise
+          {% elif v.lifecycle_status == 'processo' %}⚖️ Processo
+          {% elif v.lifecycle_status == 'projeto_lei' %}📋 Projeto de Lei
+          {% elif v.lifecycle_status == 'votacao' %}🗳️ Em votação
+          {% endif %}
+          &nbsp;|&nbsp; <a href="/denuncia/{{ v.id }}" style="color:#C62828;font-size:0.72rem;font-weight:700">Ver →</a>
+        </div>
+      </div>
+      {% endfor %}
+      <a href="/denuncia" style="display:block;text-align:center;font-size:0.82rem;color:#C62828;margin-top:0.8rem;font-weight:600">Ver todas as denúncias →</a>
+    </div>
+    {% endif %}
+
+    <!-- LINK DREX -->
+    <div class="side-card" style="background:linear-gradient(135deg,#1565C0,#2E7D32);color:white;text-align:center">
+      <div style="font-size:2rem;margin-bottom:0.5rem">💳</div>
+      <h3 style="color:white;border-bottom:none;margin:0 0 0.5rem">Gestor DREX</h3>
+      <p style="font-size:0.82rem;opacity:0.9;margin:0 0 0.8rem">Calcule quanto você paga de imposto e onde vai cada real</p>
+      <a href="/drex" style="display:inline-block;background:white;color:#1565C0;border-radius:8px;padding:8px 20px;font-weight:700;font-size:0.85rem;text-decoration:none">Entrar →</a>
+    </div>
+  </div>
 </div>
-{% endfor %}
-{% if not items %}
-<div class="card" style="text-align:center;padding:40px">
-  <p style="color:var(--text-light)">Nenhuma notícia encontrada para os filtros selecionados.</p>
-  <a href="/feed" class="btn btn-green" style="margin-top:12px">Ver todas</a>
-</div>
-{% endif %}
 {% endblock %}

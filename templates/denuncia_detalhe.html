@@ -1,0 +1,284 @@
+{% extends 'base.html' %}
+{% block title %}Denúncia #{{ v.id }} — Ciclo de Vida{% endblock %}
+{% block content %}
+<style>
+.detalhe-header { background: linear-gradient(135deg, #B71C1C, #E53935); color: white; padding: 2rem; border-radius: 16px; margin-bottom: 2rem; }
+.detalhe-header h1 { font-size: 1.4rem; margin: 0 0 0.5rem; }
+.badge-status { display: inline-block; background: rgba(255,255,255,0.2); border-radius: 20px; padding: 4px 14px; font-size: 0.85rem; font-weight: 600; }
+.lifecycle-track { display: flex; align-items: center; gap: 0; margin: 2rem 0; overflow-x: auto; padding-bottom: 0.5rem; }
+.lc-step { display: flex; flex-direction: column; align-items: center; min-width: 100px; }
+.lc-circle { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; border: 3px solid #e0e0e0; background: white; position: relative; z-index: 1; }
+.lc-circle.done { background: #2E7D32; border-color: #2E7D32; color: white; }
+.lc-circle.active { background: #1565C0; border-color: #1565C0; color: white; box-shadow: 0 0 0 6px rgba(21,101,192,0.15); }
+.lc-label { font-size: 0.72rem; text-align: center; margin-top: 6px; color: #555; max-width: 90px; line-height: 1.2; }
+.lc-label.active { color: #1565C0; font-weight: 700; }
+.lc-connector { flex: 1; height: 3px; background: #e0e0e0; min-width: 20px; }
+.lc-connector.done { background: #2E7D32; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+@media(max-width:768px){ .grid2 { grid-template-columns: 1fr; } }
+.card { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 12px rgba(0,0,0,0.07); }
+.card h3 { margin: 0 0 1rem; font-size: 1rem; color: #333; }
+.log-item { border-left: 3px solid #e0e0e0; padding: 0.5rem 0.5rem 0.5rem 1rem; margin-bottom: 0.8rem; }
+.log-item.recebida { border-color: #78909C; }
+.log-item.analisada { border-color: #1E88E5; }
+.log-item.processo { border-color: #F4511E; }
+.log-item.projeto_lei { border-color: #8E24AA; }
+.log-item.votacao { border-color: #FFB300; }
+.log-item.encerrada { border-color: #43A047; }
+.log-item .log-status { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+.log-item .log-nota { font-size: 0.88rem; color: #444; margin: 2px 0; }
+.log-item .log-data { font-size: 0.75rem; color: #999; }
+.doc-item { display: flex; align-items: center; gap: 10px; padding: 8px; background: #f5f5f5; border-radius: 8px; margin-bottom: 6px; }
+.doc-icon { font-size: 1.3rem; }
+.doc-info { flex: 1; }
+.doc-titulo { font-size: 0.88rem; font-weight: 600; }
+.doc-data { font-size: 0.75rem; color: #777; }
+.vote-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0.5rem 0; }
+.vote-btn { border: 2px solid #e0e0e0; background: white; border-radius: 10px; padding: 12px; cursor: pointer; text-align: center; transition: all 0.2s; font-size: 0.85rem; }
+.vote-btn:hover { border-color: #1565C0; background: #e8f0fe; }
+.vote-btn .icon { font-size: 1.4rem; display: block; }
+.vote-btn .count { font-size: 0.75rem; color: #777; margin-top: 2px; }
+.vote-btn.voted { border-color: #2E7D32; background: #e8f5e9; }
+.modality-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.modality-btn { background: white; border: 2px solid #e0e0e0; border-radius: 10px; padding: 12px 6px; cursor: pointer; text-align: center; font-size: 0.82rem; transition: all 0.2s; }
+.modality-btn:hover { border-color: #8E24AA; background: #f3e5f5; }
+.modality-btn .icon { font-size: 1.3rem; display: block; margin-bottom: 2px; }
+.art-box { background: #e8f5e9; border-radius: 10px; padding: 1rem; border-left: 4px solid #2E7D32; }
+.art-box .art-num { font-size: 0.85rem; font-weight: 700; color: #1B5E20; }
+.art-box .art-text { font-size: 0.85rem; color: #444; margin: 4px 0; }
+.art-box .art-simple { font-size: 0.82rem; color: #555; font-style: italic; }
+.promover-box { background: #fff3e0; border: 2px solid #FF6F00; border-radius: 12px; padding: 1.2rem; }
+.promover-box h4 { color: #E65100; margin: 0 0 0.8rem; font-size: 0.95rem; }
+.promover-input { width: 100%; padding: 8px 10px; border: 1.5px solid #ccc; border-radius: 8px; font-size: 0.88rem; margin-bottom: 0.5rem; box-sizing: border-box; }
+.btn-promover { background: linear-gradient(135deg, #E65100, #BF360C); color: white; border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; font-weight: 700; font-size: 0.88rem; width: 100%; }
+.btn-promover:hover { opacity: 0.9; }
+.info-pill { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.15); border-radius: 20px; padding: 4px 12px; font-size: 0.82rem; margin: 2px 4px 2px 0; }
+</style>
+
+<a href="/denuncia" style="display:inline-flex;align-items:center;gap:6px;color:#555;text-decoration:none;font-size:0.88rem;margin-bottom:1rem">
+  ← Voltar para Denúncias
+</a>
+
+<div class="detalhe-header">
+  <div style="margin-bottom:0.5rem">
+    <span class="badge-status">{{ v.stage_info.label }}</span>
+    {% if v.processo_numero %}<span class="info-pill">⚖️ {{ v.processo_numero }}</span>{% endif %}
+    {% if v.pl_numero %}<span class="info-pill">📋 {{ v.pl_numero }}</span>{% endif %}
+  </div>
+  <h1>Denúncia #{{ v.id }} — Art. {{ v.article_number }}</h1>
+  <p style="margin:0;opacity:0.85;font-size:0.9rem">{{ v.description }}</p>
+  <div style="margin-top:0.8rem;opacity:0.75;font-size:0.8rem">
+    📍 {{ v.level }} {% if v.location %}— {{ v.location }}{% endif %} &nbsp;|&nbsp;
+    📅 {{ v.created_at }} &nbsp;|&nbsp;
+    👥 {{ v.support_count }} apoios
+  </div>
+</div>
+
+<!-- LINHA DO TEMPO DE LIFECYCLE -->
+<div class="lifecycle-track">
+  {% for key, stage in lifecycle_stages.items() %}
+  {% set idx = loop.index0 %}
+  {% if idx > 0 %}
+  <div class="lc-connector {% if idx <= current_idx %}done{% endif %}"></div>
+  {% endif %}
+  <div class="lc-step">
+    <div class="lc-circle {% if idx < current_idx %}done{% elif idx == current_idx %}active{% endif %}">
+      {% if idx < current_idx %}✓
+      {% elif idx == current_idx %}●
+      {% else %}○{% endif %}
+    </div>
+    <div class="lc-label {% if idx == current_idx %}active{% endif %}">{{ stage.label }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="grid2">
+  <!-- ESQUERDA -->
+  <div>
+    <!-- ARTIGO VIOLADO -->
+    {% if article %}
+    <div class="card" style="margin-bottom:1rem">
+      <h3>📜 Artigo Constitucional Denunciado</h3>
+      <div class="art-box">
+        <div class="art-num">{{ article.article_number }}</div>
+        <div class="art-text">{{ article.official_text }}</div>
+        <div class="art-simple">💬 {{ article.simple_explanation }}</div>
+        {% if article.reality_check %}
+        <div style="margin-top:0.5rem;font-size:0.8rem;color:#C62828;border-top:1px solid #c8e6c9;padding-top:0.5rem">
+          🔴 Reality check: {{ article.reality_check }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- EVIDÊNCIAS -->
+    {% if v.evidence %}
+    <div class="card" style="margin-bottom:1rem">
+      <h3>🔎 Evidências Apresentadas</h3>
+      <p style="font-size:0.9rem;color:#444;margin:0">{{ v.evidence }}</p>
+    </div>
+    {% endif %}
+
+    <!-- DOCUMENTOS -->
+    <div class="card" style="margin-bottom:1rem">
+      <h3>📁 Documentação do Processo</h3>
+      {% if v.documentos %}
+        {% for doc in v.documentos %}
+        <div class="doc-item">
+          <div class="doc-icon">📄</div>
+          <div class="doc-info">
+            <div class="doc-titulo">{{ doc.titulo }}</div>
+            <div class="doc-data">{{ doc.tipo }} — {{ doc.data }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p style="color:#999;font-size:0.88rem;margin:0">Nenhum documento adicionado ainda.</p>
+      {% endif %}
+
+      {% if v.lifecycle_status not in ['encerrada'] %}
+      <form onsubmit="addDoc(event)" style="margin-top:1rem">
+        <input class="promover-input" id="doc-titulo" placeholder="Descrição do documento..." required>
+        <button type="submit" class="btn-promover" style="background:#1565C0">📎 Adicionar Documento</button>
+      </form>
+      {% endif %}
+    </div>
+
+    <!-- AVANÇAR LIFECYCLE (admin/cidadão) -->
+    {% if v.stage_info.next %}
+    <div class="promover-box" style="margin-bottom:1rem">
+      <h4>⚡ Avançar para próxima etapa: {{ lifecycle_stages[v.stage_info.next].label }}</h4>
+      <input class="promover-input" id="promo-nota" placeholder="Nota sobre o avanço...">
+      {% if v.stage_info.next in ['processo', 'projeto_lei'] %}
+      <input class="promover-input" id="promo-numero" placeholder="Número do {{ 'processo' if v.stage_info.next == 'processo' else 'PL' }}...">
+      {% endif %}
+      <button class="btn-promover" onclick="promover()">
+        🚀 Avançar para {{ lifecycle_stages[v.stage_info.next].label }}
+      </button>
+      <div id="promo-msg" style="display:none;margin-top:0.5rem;font-size:0.85rem;color:#2E7D32;font-weight:600"></div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- DIREITA -->
+  <div>
+    <!-- VOTAÇÃO PRINCIPAL -->
+    <div class="card" style="margin-bottom:1rem">
+      <h3>🗳️ Votação da Denúncia</h3>
+      <p style="font-size:0.82rem;color:#777;margin-bottom:0.8rem">Você apoia esta denúncia?</p>
+      <div class="vote-grid">
+        <button class="vote-btn" onclick="votar('approve')" id="btn-approve">
+          <span class="icon">✅</span>
+          <strong>Apoio</strong>
+          <div class="count" id="cnt-approve">{{ v.votes_approve or 0 }} votos</div>
+        </button>
+        <button class="vote-btn" onclick="votar('reject')" id="btn-reject">
+          <span class="icon">❌</span>
+          <strong>Não apoio</strong>
+          <div class="count" id="cnt-reject">{{ v.votes_reject or 0 }} votos</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- MODALIDADE DE VOTAÇÃO -->
+    <div class="card" style="margin-bottom:1rem">
+      <h3>📅 Modalidade de Deliberação</h3>
+      <p style="font-size:0.82rem;color:#777;margin-bottom:0.8rem">Como esta denúncia deve ser deliberada?</p>
+      <div class="modality-grid">
+        <button class="modality-btn" onclick="votarModalidade('audiencia')" id="mod-audiencia">
+          <span class="icon">🎙️</span>
+          Audiência Pública
+          <div style="font-size:0.72rem;color:#999;margin-top:2px" id="cnt-audiencia">{{ modality_votes.audiencia }} votos</div>
+        </button>
+        <button class="modality-btn" onclick="votarModalidade('reuniao')" id="mod-reuniao">
+          <span class="icon">🤝</span>
+          Reunião
+          <div style="font-size:0.72rem;color:#999;margin-top:2px" id="cnt-reuniao">{{ modality_votes.reuniao }} votos</div>
+        </button>
+        <button class="modality-btn" onclick="votarModalidade('assembleia')" id="mod-assembleia">
+          <span class="icon">🏛️</span>
+          Assembleia
+          <div style="font-size:0.72rem;color:#999;margin-top:2px" id="cnt-assembleia">{{ modality_votes.assembleia }} votos</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- HISTÓRICO LIFECYCLE -->
+    <div class="card">
+      <h3>📋 Histórico de Tramitação</h3>
+      {% if v.lifecycle_log %}
+        {% for entry in v.lifecycle_log %}
+        <div class="log-item {{ entry.status }}">
+          <div class="log-status" style="color: {{ lifecycle_stages[entry.status].color if entry.status in lifecycle_stages else '#555' }}">
+            {{ lifecycle_stages[entry.status].label if entry.status in lifecycle_stages else entry.status }}
+          </div>
+          <div class="log-nota">{{ entry.nota }}</div>
+          <div class="log-data">📅 {{ entry.data }}</div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p style="color:#999;font-size:0.88rem">Sem histórico ainda.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+const vid = {{ v.id }};
+
+async function votar(tipo) {
+  const res = await fetch(`/denuncia/${vid}/votar`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({tipo})
+  });
+  const d = await res.json();
+  document.getElementById('cnt-approve').textContent = (d.votes_approve || 0) + ' votos';
+  document.getElementById('cnt-reject').textContent = (d.votes_reject || 0) + ' votos';
+  document.getElementById('btn-' + tipo).classList.add('voted');
+}
+
+async function votarModalidade(tipo) {
+  const res = await fetch(`/denuncia/${vid}/votar`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({tipo})
+  });
+  const d = await res.json();
+  document.getElementById('cnt-audiencia').textContent = (d.votes_audiencia || 0) + ' votos';
+  document.getElementById('cnt-reuniao').textContent = (d.votes_reuniao || 0) + ' votos';
+  document.getElementById('cnt-assembleia').textContent = (d.votes_assembleia || 0) + ' votos';
+  document.getElementById('mod-' + tipo).style.borderColor = '#8E24AA';
+  document.getElementById('mod-' + tipo).style.background = '#f3e5f5';
+}
+
+async function promover() {
+  const nota = document.getElementById('promo-nota').value;
+  const numEl = document.getElementById('promo-numero');
+  const numero = numEl ? numEl.value : '';
+  const docEl = document.getElementById('doc-titulo');
+
+  const res = await fetch(`/denuncia/${vid}/promover`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({nota, numero})
+  });
+  const d = await res.json();
+  if (d.ok) {
+    document.getElementById('promo-msg').style.display = 'block';
+    document.getElementById('promo-msg').textContent = '✅ Denúncia avançou para: ' + d.label;
+    setTimeout(() => location.reload(), 1200);
+  } else {
+    alert(d.error || 'Erro ao promover');
+  }
+}
+
+async function addDoc(e) {
+  e.preventDefault();
+  const titulo = document.getElementById('doc-titulo').value;
+  const res = await fetch(`/denuncia/${vid}/promover`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({nota: 'Documento adicionado: ' + titulo, documento: titulo})
+  });
+  if (res.ok) location.reload();
+}
+</script>
+{% endblock %}

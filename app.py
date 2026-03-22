@@ -430,11 +430,24 @@ def feed():
     if state: q += ' AND state=?'; args.append(state)
     if category: q += ' AND category=?'; args.append(category)
     q += ' ORDER BY created_at DESC'
-    items = query_db(q, args)
+    raw_items = query_db(q, args)
+    # Parse JSON fields
+    items = []
+    for it in raw_items:
+        d = dict(it)
+        try: d['envolvidos'] = json.loads(it['envolvidos'] or '[]')
+        except: d['envolvidos'] = []
+        try: d['eventos_inerentes'] = json.loads(it['eventos_inerentes'] or '[]')
+        except: d['eventos_inerentes'] = []
+        items.append(d)
     cats = query_db('SELECT DISTINCT category FROM feed_items ORDER BY category')
     states_list = query_db('SELECT DISTINCT state FROM feed_items WHERE state IS NOT NULL ORDER BY state')
+    # Feed também inclui cenários do simulador e denúncias ativas
+    sim_items = query_db('SELECT id, title, context, year FROM scenarios ORDER BY id DESC LIMIT 5')
+    active_violations = query_db("SELECT id, article_number, description, level, lifecycle_status, created_at FROM violations WHERE lifecycle_status != 'encerrada' ORDER BY created_at DESC LIMIT 5")
     return render_template('feed.html', items=items, cats=cats, states_list=states_list,
-                           level=level, state=state, category=category)
+                           level=level, state=state, category=category,
+                           sim_items=sim_items, active_violations=active_violations)
 
 
 # ─── CIDADÃO ─────────────────────────────────────────────────────────────────
@@ -494,22 +507,72 @@ def assinar_assembleia():
     return jsonify({'signatures': row['signatures'], 'status': new_status})
 
 
-# ─── DENÚNCIA CONSTITUCIONAL ─────────────────────────────────────────────────
+# ─── DENÚNCIA CONSTITUCIONAL v3 — Ciclo de vida completo ────────────────────
+
+LIFECYCLE_STAGES = {
+    'recebida':      {'label': '📥 Recebida',          'next': 'analisada',    'color': '#78909C'},
+    'analisada':     {'label': '🔍 Em Análise',         'next': 'processo',     'color': '#1E88E5'},
+    'processo':      {'label': '⚖️ Virou Processo',    'next': 'projeto_lei',  'color': '#F4511E'},
+    'projeto_lei':   {'label': '📋 Projeto de Lei',    'next': 'votacao',      'color': '#8E24AA'},
+    'votacao':       {'label': '🗳️ Em Votação',        'next': 'encerrada',    'color': '#FFB300'},
+    'encerrada':     {'label': '🏁 Encerrada',          'next': None,           'color': '#43A047'},
+}
+
 
 @app.route('/denuncia')
 def denuncia():
     violations = query_db('SELECT * FROM violations ORDER BY created_at DESC')
     articles = query_db('SELECT article_number, simple_explanation FROM constitution_articles ORDER BY id')
-    return render_template('denuncia.html', violations=violations, articles=articles, levels=LEVELS)
+    # parse lifecycle_log JSON
+    vlist = []
+    for v in violations:
+        vd = dict(v)
+        try: vd['lifecycle_log'] = json.loads(v['lifecycle_log'] or '[]')
+        except: vd['lifecycle_log'] = []
+        try: vd['documentos'] = json.loads(v['documentos'] or '[]')
+        except: vd['documentos'] = []
+        vd['stage_info'] = LIFECYCLE_STAGES.get(vd.get('lifecycle_status','recebida'), LIFECYCLE_STAGES['recebida'])
+        vlist.append(vd)
+    return render_template('denuncia.html', violations=vlist, articles=articles, levels=LEVELS,
+                           lifecycle_stages=LIFECYCLE_STAGES)
+
+
+@app.route('/denuncia/<int:vid>')
+def denuncia_detalhe(vid):
+    v = query_db('SELECT * FROM violations WHERE id=?', (vid,), one=True)
+    if not v:
+        return render_template('404.html'), 404
+    vd = dict(v)
+    try: vd['lifecycle_log'] = json.loads(v['lifecycle_log'] or '[]')
+    except: vd['lifecycle_log'] = []
+    try: vd['documentos'] = json.loads(v['documentos'] or '[]')
+    except: vd['documentos'] = []
+    vd['stage_info'] = LIFECYCLE_STAGES.get(vd.get('lifecycle_status','recebida'), LIFECYCLE_STAGES['recebida'])
+    article = query_db('SELECT * FROM constitution_articles WHERE article_number=?',
+                       (vd['article_number'],), one=True)
+    total_votes = (vd['votes_approve'] or 0) + (vd['votes_reject'] or 0)
+    modality_votes = {
+        'audiencia': vd.get('votes_audiencia', 0),
+        'reuniao': vd.get('votes_reuniao', 0),
+        'assembleia': vd.get('votes_assembleia', 0),
+    }
+    stages_list = list(LIFECYCLE_STAGES.items())
+    current_idx = next((i for i, (k, _) in enumerate(stages_list) if k == vd.get('lifecycle_status','recebida')), 0)
+    return render_template('denuncia_detalhe.html', v=vd, article=article,
+                           total_votes=total_votes, modality_votes=modality_votes,
+                           lifecycle_stages=LIFECYCLE_STAGES, stages_list=stages_list,
+                           current_idx=current_idx)
 
 
 @app.route('/denuncia/nova', methods=['POST'])
 def nova_denuncia():
     data = request.get_json()
+    import datetime
+    log_entry = json.dumps([{'status': 'recebida', 'data': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), 'nota': 'Denúncia registrada pelo cidadão'}])
     get_db().execute(
-        'INSERT INTO violations (article_number, description, level, location, evidence) VALUES (?,?,?,?,?)',
+        'INSERT INTO violations (article_number, description, level, location, evidence, lifecycle_status, lifecycle_log) VALUES (?,?,?,?,?,?,?)',
         (data['article_number'], data['description'], data['level'],
-         data.get('location', ''), data.get('evidence', ''))
+         data.get('location', ''), data.get('evidence', ''), 'recebida', log_entry)
     )
     get_db().commit()
     count = query_db('SELECT COUNT(*) as c FROM violations WHERE article_number=?',
@@ -524,6 +587,211 @@ def apoiar_denuncia():
     get_db().commit()
     row = query_db('SELECT support_count FROM violations WHERE id=?', (vid,), one=True)
     return jsonify({'support_count': row['support_count']})
+
+
+@app.route('/denuncia/<int:vid>/promover', methods=['POST'])
+def promover_denuncia(vid):
+    import datetime
+    data = request.get_json() or {}
+    v = query_db('SELECT * FROM violations WHERE id=?', (vid,), one=True)
+    if not v:
+        return jsonify({'error': 'Não encontrada'}), 404
+    current = v['lifecycle_status'] or 'recebida'
+    stage = LIFECYCLE_STAGES.get(current, {})
+    next_status = stage.get('next')
+    if not next_status:
+        return jsonify({'error': 'Já encerrada'}), 400
+    # Update log
+    try: log = json.loads(v['lifecycle_log'] or '[]')
+    except: log = []
+    log.append({
+        'status': next_status,
+        'data': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'nota': data.get('nota', f'Avançou para: {LIFECYCLE_STAGES[next_status]["label"]}')
+    })
+    # Assign processo/pl numbers if applicable
+    extras = {}
+    if next_status == 'processo':
+        extras['processo_numero'] = data.get('numero', f'PROC-{vid:04d}/2025')
+    elif next_status == 'projeto_lei':
+        extras['pl_numero'] = data.get('numero', f'PL-{vid:04d}/2025')
+    # Add document if provided
+    try: docs = json.loads(v['documentos'] or '[]')
+    except: docs = []
+    if data.get('documento'):
+        docs.append({'titulo': data['documento'], 'data': datetime.datetime.now().strftime('%Y-%m-%d'), 'tipo': next_status})
+    db = get_db()
+    db.execute('UPDATE violations SET lifecycle_status=?, lifecycle_log=?, documentos=? WHERE id=?',
+               (next_status, json.dumps(log), json.dumps(docs), vid))
+    for col, val in extras.items():
+        db.execute(f'UPDATE violations SET {col}=? WHERE id=?', (val, vid))
+    db.commit()
+    return jsonify({'ok': True, 'new_status': next_status, 'label': LIFECYCLE_STAGES[next_status]['label']})
+
+
+@app.route('/denuncia/<int:vid>/votar', methods=['POST'])
+def votar_denuncia(vid):
+    data = request.get_json() or {}
+    tipo = data.get('tipo')  # 'approve', 'reject', 'audiencia', 'reuniao', 'assembleia'
+    valid = ['approve', 'reject', 'audiencia', 'reuniao', 'assembleia']
+    if tipo not in valid:
+        return jsonify({'error': 'tipo inválido'}), 400
+    col = f'votes_{tipo}'
+    get_db().execute(f'UPDATE violations SET {col}={col}+1 WHERE id=?', (vid,))
+    get_db().commit()
+    row = query_db('SELECT votes_approve,votes_reject,votes_audiencia,votes_reuniao,votes_assembleia FROM violations WHERE id=?', (vid,), one=True)
+    return jsonify(dict(row))
+
+
+# ─── DREX — Gestor Financeiro Soberano ──────────────────────────────────────
+
+def calcular_irpf(renda_mensal):
+    """Calcula IRPF mensal com tabela progressiva 2024"""
+    renda_anual = renda_mensal * 12
+    if renda_anual <= 33888:
+        return 0.0
+    elif renda_anual <= 45012:
+        return renda_mensal * 0.075 - 169.44
+    elif renda_anual <= 55976:
+        return renda_mensal * 0.15 - 381.44
+    elif renda_anual <= 73227:
+        return renda_mensal * 0.225 - 662.77
+    else:
+        return renda_mensal * 0.275 - 1028.87
+
+def calcular_inss(renda_mensal):
+    """Calcula INSS com tabela progressiva 2024"""
+    aliquotas = [(1412, 0.075), (2666.68, 0.09), (4000.03, 0.12), (7786.02, 0.14)]
+    total = 0.0
+    prev = 0.0
+    for teto, aliq in aliquotas:
+        if renda_mensal <= prev:
+            break
+        faixa = min(renda_mensal, teto) - prev
+        total += faixa * aliq
+        prev = teto
+        if renda_mensal <= teto:
+            break
+    return min(total, 908.86)  # teto INSS 2024
+
+
+@app.route('/drex')
+def drex():
+    states_list = query_db('SELECT code, name, pib_bi, hdi, salario_medio, desemprego_pct, custo_vida_mult FROM state_economy ORDER BY name')
+    # Médias coletivas da plataforma
+    avg_data = query_db("""
+        SELECT state_code, AVG(renda) as avg_renda, AVG(irpf) as avg_irpf,
+               AVG(inss) as avg_inss, AVG(impostos_consumo) as avg_consumo,
+               AVG(total_impostos) as avg_total, COUNT(*) as total_subs
+        FROM drex_submissions GROUP BY state_code
+    """)
+    coletivo = {r['state_code']: dict(r) for r in avg_data}
+    # Alocação coletiva média
+    all_subs = query_db("SELECT alocacao FROM drex_submissions ORDER BY created_at DESC LIMIT 1000")
+    alocacao_media = {}
+    if all_subs:
+        for sub in all_subs:
+            try:
+                aloc = json.loads(sub['alocacao'])
+                for k, v in aloc.items():
+                    alocacao_media[k] = alocacao_media.get(k, 0) + float(v)
+            except: pass
+        if alocacao_media:
+            n = len(all_subs)
+            alocacao_media = {k: round(v/n, 1) for k, v in alocacao_media.items()}
+    return render_template('drex.html', states_list=states_list,
+                           coletivo=coletivo, alocacao_media=alocacao_media,
+                           orcamento_setores=ORCAMENTO_SETORES)
+
+
+@app.route('/drex/estado/<code>')
+def drex_estado(code):
+    state = query_db('SELECT * FROM state_economy WHERE code=?', (code.upper(),), one=True)
+    if not state:
+        return jsonify({'error': 'Estado não encontrado'}), 404
+    sd = dict(state)
+    try: sd['setores_principais'] = json.loads(state['setores_principais'] or '[]')
+    except: sd['setores_principais'] = []
+    # Médias do estado
+    avg = query_db("""
+        SELECT AVG(renda) as avg_renda, AVG(total_impostos) as avg_impostos,
+               COUNT(*) as participantes FROM drex_submissions WHERE state_code=?
+    """, (code.upper(),), one=True)
+    sd['media_renda'] = round(avg['avg_renda'] or 0, 2)
+    sd['media_impostos'] = round(avg['avg_impostos'] or 0, 2)
+    sd['participantes'] = avg['participantes'] or 0
+    return jsonify(sd)
+
+
+@app.route('/drex/calcular', methods=['POST'])
+def drex_calcular():
+    data = request.get_json() or {}
+    renda = float(data.get('renda', 0))
+    state_code = data.get('estado', 'SP').upper()
+    alocacao = data.get('alocacao', {})
+
+    if renda <= 0:
+        return jsonify({'error': 'Renda inválida'}), 400
+
+    irpf = calcular_irpf(renda)
+    inss = calcular_inss(renda)
+    # Impostos no consumo: assume 70% da renda líquida vai pra consumo; ~34% de impostos embutidos
+    renda_liquida = renda - irpf - inss
+    consumo_estimado = renda_liquida * 0.70
+    impostos_consumo = consumo_estimado * 0.34  # ICMS+PIS+COFINS+IPI+ISS estimados
+    total_impostos = irpf + inss + impostos_consumo
+
+    # Carga tributária efetiva
+    carga_pct = (total_impostos / renda * 100) if renda > 0 else 0
+
+    # Custo de vida pelo estado
+    state = query_db('SELECT custo_vida_mult, cooperativismo_fed_pct FROM state_economy WHERE code=?',
+                     (state_code,), one=True)
+    mult = float(state['custo_vida_mult']) if state else 1.0
+    coop_pct = float(state['cooperativismo_fed_pct']) if state else 15.0
+
+    # Distribuição dos impostos por setor (estimativa constitucional)
+    distribuicao = {
+        'Previdência (INSS)': round(inss, 2),
+        'Saúde (SUS)': round(total_impostos * 0.08, 2),
+        'Educação': round(total_impostos * 0.07, 2),
+        'Juros da Dívida': round(total_impostos * 0.36, 2),
+        'Segurança Pública': round(total_impostos * 0.04, 2),
+        'Infraestrutura': round(total_impostos * 0.03, 2),
+        'Outros': round(total_impostos * 0.08, 2),
+    }
+
+    # Salvar no DB
+    get_db().execute("""
+        INSERT INTO drex_submissions (state_code, renda, irpf, inss, impostos_consumo, total_impostos, alocacao)
+        VALUES (?,?,?,?,?,?,?)""",
+        (state_code, renda, irpf, inss, impostos_consumo, total_impostos, json.dumps(alocacao)))
+    get_db().commit()
+
+    # Médias coletivas por estado
+    avg = query_db("""
+        SELECT AVG(renda) as ar, AVG(total_impostos) as at, COUNT(*) as n
+        FROM drex_submissions WHERE state_code=?
+    """, (state_code,), one=True)
+
+    return jsonify({
+        'renda': round(renda, 2),
+        'irpf': round(irpf, 2),
+        'inss': round(inss, 2),
+        'impostos_consumo': round(impostos_consumo, 2),
+        'total_impostos': round(total_impostos, 2),
+        'renda_liquida': round(renda_liquida, 2),
+        'carga_pct': round(carga_pct, 1),
+        'custo_vida_mult': mult,
+        'cooperativismo_fed_pct': coop_pct,
+        'cooperativismo_valor': round(renda * coop_pct / 100, 2),
+        'distribuicao': distribuicao,
+        'coletivo': {
+            'avg_renda': round(avg['ar'] or 0, 2),
+            'avg_impostos': round(avg['at'] or 0, 2),
+            'participantes': avg['n'] or 0
+        }
+    })
 
 
 # ─── ECONOMIA ────────────────────────────────────────────────────────────────

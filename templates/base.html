@@ -67,10 +67,11 @@
 
         <!-- 💰 ECONOMIA -->
         <div class="nav-group">
-          <button class="nav-group-btn {% if request.path in ['/crimes','/mercado'] %}active{% endif %}">💰 Economia ▾</button>
+          <button class="nav-group-btn {% if request.path in ['/crimes','/mercado','/drex'] %}active{% endif %}">💰 Economia ▾</button>
           <div class="nav-dropdown">
             <a href="/crimes">🔍 Crimes Financeiros</a>
             <a href="/mercado">🏭 Mercado Soberano</a>
+            <a href="/drex">💳 Gestor DREX</a>
           </div>
         </div>
 
