@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+{% block title %}{{ p.produto[:40] }} — Compra Pública{% endblock %}
+{% block content %}
+<style>
+.comp-hero{padding:2rem;border-radius:16px;margin-bottom:2rem;color:white}
+.comp-hero.normal{background:linear-gradient(135deg,#004D40,#00695C)}
+.comp-hero.suspeita{background:linear-gradient(135deg,#B71C1C,#C62828)}
+.comp-hero h1{font-size:1.4rem;margin:0 0 .3rem}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+@media(max-width:768px){.grid2{grid-template-columns:1fr}}
+.card{background:white;border-radius:12px;padding:1.4rem;box-shadow:0 2px 12px rgba(0,0,0,.07);margin-bottom:1rem}
+.card h3{font-size:.95rem;margin:0 0 1rem;color:#333;border-bottom:2px solid #f0f0f0;padding-bottom:.5rem}
+.info-row{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid #f5f5f5;font-size:.87rem}
+.info-row:last-child{border-bottom:none}
+.info-row .k{color:#777;font-weight:500;min-width:150px;flex-shrink:0}
+.info-row .v{font-weight:600;color:#222}
+.alerta-box{border-radius:8px;padding:.8rem 1rem;font-size:.87rem;margin:.5rem 0;line-height:1.5}
+.alerta-box.suspeita{background:#ffebee;color:#C62828;border-left:4px solid #E53935}
+.alerta-box.ok{background:#e8f5e9;color:#1B5E20;border-left:4px solid #43A047}
+.alerta-box.info{background:#e3f2fd;color:#1565C0;border-left:4px solid #1565C0}
+.badge{display:inline-block;padding:3px 12px;border-radius:14px;font-size:.75rem;font-weight:700}
+.badge.verde{background:#e8f5e9;color:#1B5E20}
+.badge.azul{background:#e3f2fd;color:#1565C0}
+.badge.vermelho{background:#ffebee;color:#C62828}
+.badge.amarelo{background:#fff8e1;color:#F57F17}
+.validar-box{background:#f9f9f9;border-radius:10px;padding:1rem;font-size:.85rem;color:#333;line-height:1.7}
+.validar-box a{color:#004D40;font-weight:600}
+.step-item{border-left:3px solid #004D40;padding:.5rem .5rem .5rem 1rem;margin-bottom:.6rem}
+.step-item .step-titulo{font-size:.8rem;font-weight:700;color:#004D40;text-transform:uppercase;letter-spacing:.5px}
+.step-item .step-desc{font-size:.85rem;color:#444;margin:2px 0}
+.proj-box{background:#e8f5e9;border-radius:10px;padding:1rem;margin-top:.5rem}
+.proj-box .ptitle{font-size:.9rem;font-weight:700;color:#1B5E20}
+.proj-box .pmeta{font-size:.78rem;color:#555;margin-top:2px}
+.prg-bar{background:#e0e0e0;border-radius:20px;height:8px;overflow:hidden;margin:4px 0}
+.prg-fill{height:100%;border-radius:20px;background:linear-gradient(90deg,#2E7D32,#66BB6A)}
+</style>
+
+<a href="/compras" style="display:inline-flex;align-items:center;gap:6px;color:#555;text-decoration:none;font-size:.88rem;margin-bottom:1rem">← Voltar para Compras</a>
+
+<div class="comp-hero {{ 'suspeita' if p.suspeita_irregularidade else 'normal' }}">
+  <div style="font-size:.78rem;opacity:.75;margin-bottom:.3rem">
+    {{ modalidades.get(p.modalidade,'') }} &nbsp;|&nbsp; {{ p.data_hora[:10] }}
+    {% if p.numero_processo %}&nbsp;|&nbsp; {{ p.numero_processo }}{% endif %}
+  </div>
+  <h1>{% if p.suspeita_irregularidade %}⚠️ {% endif %}{{ p.produto }}</h1>
+  <div style="font-size:1.6rem;font-weight:800;margin:.3rem 0">R$ {{ '{:,.2f}'.format(p.valor_total) }}</div>
+  <div style="font-size:.85rem;opacity:.85">{{ p.comprador_orgao }}</div>
+</div>
+
+{% if p.suspeita_irregularidade %}
+<div class="alerta-box suspeita">
+  ⚠️ <strong>IRREGULARIDADE SUSPEITA:</strong> {{ p.nota_irregularidade }}
+</div>
+{% endif %}
+
+<div class="grid2">
+  <!-- COLUNA 1 -->
+  <div>
+    <!-- PRODUTO -->
+    <div class="card">
+      <h3>📦 Descrição do Produto/Serviço</h3>
+      <div class="alerta-box info" style="border-left:none;background:#f9f9f9;color:#333">{{ p.descricao_completa }}</div>
+      <div class="info-row"><span class="k">Quantidade</span><span class="v">{{ p.quantidade }} {{ p.unidade }}</span></div>
+      <div class="info-row"><span class="k">Valor unitário</span><span class="v">R$ {{ '{:,.2f}'.format(p.valor_unitario) }}</span></div>
+      <div class="info-row"><span class="k">Valor total</span><span class="v" style="color:#004D40;font-size:1.05rem">R$ {{ '{:,.2f}'.format(p.valor_total) }}</span></div>
+      <div class="info-row"><span class="k">Status</span>
+        <span class="v">
+          <span class="badge {{ 'verde' if p.status in ('entregue','pago') else 'azul' if p.status=='em_execucao' else 'amarelo' }}">
+            {{ status_map.get(p.status, p.status) }}
+          </span>
+        </span>
+      </div>
+    </div>
+
+    <!-- COMPRADOR -->
+    <div class="card">
+      <h3>🏛️ Comprador (Órgão Público)</h3>
+      <div class="info-row"><span class="k">Órgão</span><span class="v">{{ p.comprador_orgao }}</span></div>
+      {% if p.comprador_uasg %}<div class="info-row"><span class="k">UASG</span><span class="v">{{ p.comprador_uasg }}</span></div>{% endif %}
+      <div class="info-row"><span class="k">Recurso orçamentário</span><span class="v">{{ p.recurso_orcamentario }}</span></div>
+      <div class="info-row"><span class="k">Necessidade</span><span class="v">{{ p.necessidade }}</span></div>
+      {% if projeto %}
+      <div class="proj-box">
+        <div class="ptitle">🔗 Projeto: {{ projeto.title }}</div>
+        <div class="pmeta">{{ projeto.responsible }} &nbsp;|&nbsp; Budget: R$ {{ projeto.budget_bi }}bi</div>
+        <div class="prg-bar"><div class="prg-fill" style="width:{{ projeto.progress_pct }}%"></div></div>
+        <div style="font-size:.72rem;color:#777">{{ projeto.progress_pct }}% concluído</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- FORNECEDOR -->
+    <div class="card">
+      <h3>🏭 Fornecedor</h3>
+      <div class="info-row"><span class="k">Empresa</span><span class="v">{{ p.fornecedor }}</span></div>
+      {% if p.fornecedor_cnpj %}<div class="info-row"><span class="k">CNPJ</span><span class="v">{{ p.fornecedor_cnpj }}</span></div>{% endif %}
+      {% if p.nota_fiscal %}<div class="info-row"><span class="k">Nota Fiscal</span><span class="v">{{ p.nota_fiscal }}</span></div>{% endif %}
+      {% if p.fiscal_responsavel %}<div class="info-row"><span class="k">Fiscal responsável</span><span class="v">{{ p.fiscal_responsavel }}</span></div>{% endif %}
+    </div>
+  </div>
+
+  <!-- COLUNA 2 -->
+  <div>
+    <!-- DATAS E TRANSPORTE -->
+    <div class="card">
+      <h3>📅 Data, Hora e Logística</h3>
+      <div class="info-row"><span class="k">Data e hora do contrato</span><span class="v">{{ p.data_hora }}</span></div>
+      {% if p.prazo_entrega %}<div class="info-row"><span class="k">Prazo de entrega</span><span class="v">{{ p.prazo_entrega }}</span></div>{% endif %}
+      {% if p.data_entrega_real %}<div class="info-row"><span class="k">Entrega realizada em</span><span class="v">{{ p.data_entrega_real }}</span></div>{% endif %}
+      {% if p.transporte %}
+      <div class="info-row" style="flex-direction:column">
+        <span class="k">🚛 Transporte e logística</span>
+        <span class="v" style="margin-top:4px;font-size:.85rem;color:#444">{{ p.transporte }}</span>
+      </div>
+      {% endif %}
+      {% if p.data_entrega_real and p.prazo_entrega %}
+      <div class="alerta-box ok" style="margin-top:.5rem">✅ Entrega concluída</div>
+      {% elif not p.data_entrega_real and p.prazo_entrega %}
+      <div class="alerta-box info" style="margin-top:.5rem">🔄 Aguardando entrega até: {{ p.prazo_entrega }}</div>
+      {% endif %}
+    </div>
+
+    <!-- COMO VALIDAR (PASSOS) -->
+    <div class="card">
+      <h3>🔍 Como Validar Esta Compra</h3>
+      <div class="step-item">
+        <div class="step-titulo">1. Consultar o processo licitatório</div>
+        <div class="step-desc">Número: <strong>{{ p.numero_processo or 'Ver no portal abaixo' }}</strong> — busque no ComprasNet ou portal do órgão</div>
+      </div>
+      {% if p.fornecedor_cnpj %}
+      <div class="step-item">
+        <div class="step-titulo">2. Verificar o fornecedor</div>
+        <div class="step-desc">CNPJ {{ p.fornecedor_cnpj }} — consulte em <a href="https://receita.economia.gov.br" target="_blank">receita.economia.gov.br</a> e <a href="https://portaldatransparencia.gov.br" target="_blank">Portal da Transparência</a></div>
+      </div>
+      {% endif %}
+      {% if p.nota_fiscal %}
+      <div class="step-item">
+        <div class="step-titulo">3. Verificar a Nota Fiscal</div>
+        <div class="step-desc">{{ p.nota_fiscal }} — valide em <a href="https://nfe.fazenda.gov.br" target="_blank">nfe.fazenda.gov.br</a></div>
+      </div>
+      {% endif %}
+      <div class="step-item">
+        <div class="step-titulo">4. Portais de rastreabilidade</div>
+        <div class="step-desc">{{ p.como_validar }}</div>
+      </div>
+      {% if p.suspeita_irregularidade %}
+      <div class="step-item" style="border-color:#E53935">
+        <div class="step-titulo" style="color:#E53935">5. Denunciar irregularidade</div>
+        <div class="step-desc">CGU: <a href="https://cgu.gov.br/falabr" target="_blank">cgu.gov.br/falabr</a> &nbsp;|&nbsp; MP: <a href="https://mpf.mp.br" target="_blank">mpf.mp.br</a> &nbsp;|&nbsp; TCU: <a href="https://tcu.gov.br/denuncias" target="_blank">tcu.gov.br/denuncias</a></div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- VALIDAÇÃO RÁPIDA -->
+    <div class="card">
+      <h3>⚡ Validação Rápida</h3>
+      <div class="validar-box">
+        {{ p.como_validar }}
+      </div>
+      {% if p.portal_url %}
+      <a href="{{ p.portal_url }}" target="_blank" style="display:block;text-align:center;background:#004D40;color:white;border-radius:8px;padding:10px;margin-top:.8rem;font-size:.85rem;font-weight:700;text-decoration:none">
+        🔗 Abrir Portal Oficial
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

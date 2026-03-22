@@ -57,9 +57,10 @@
 
         <!-- 🧑 CIDADÃO -->
         <div class="nav-group">
-          <button class="nav-group-btn {% if request.path in ['/cidadao','/denuncia','/constituicao'] %}active{% endif %}">🧑 Cidadão ▾</button>
+          <button class="nav-group-btn {% if request.path in ['/cidadao','/denuncia','/constituicao','/previdencia'] %}active{% endif %}">🧑 Cidadão ▾</button>
           <div class="nav-dropdown">
             <a href="/cidadao">🎯 Meu Papel</a>
+            <a href="/previdencia">👴 Aposentadoria INSS</a>
             <a href="/denuncia">🚨 Denúncias</a>
             <a href="/constituicao">📜 Constituição</a>
           </div>
@@ -67,12 +68,13 @@
 
         <!-- 💰 ECONOMIA -->
         <div class="nav-group">
-          <button class="nav-group-btn {% if request.path in ['/crimes','/mercado','/drex'] or request.path.startswith('/rastreabilidade') %}active{% endif %}">💰 Economia ▾</button>
+          <button class="nav-group-btn {% if request.path in ['/crimes','/mercado','/drex','/compras'] or request.path.startswith('/rastreabilidade') or request.path.startswith('/compras') %}active{% endif %}">💰 Economia ▾</button>
           <div class="nav-dropdown">
             <a href="/crimes">🔍 Crimes Financeiros</a>
             <a href="/mercado">🏭 Mercado Soberano</a>
             <a href="/drex">💳 Gestor DREX</a>
             <a href="/rastreabilidade">🔗 Rastreabilidade Fiscal</a>
+            <a href="/compras">🧾 Compras do Governo</a>
           </div>
         </div>
 

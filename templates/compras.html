@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% block title %}Compras do Governo — Rastreabilidade{% endblock %}
+{% block content %}
+<style>
+.comp-hero{background:linear-gradient(135deg,#004D40,#00695C,#1565C0);color:white;padding:2rem;border-radius:16px;margin-bottom:2rem}
+.comp-hero h1{font-size:1.8rem;margin:0 0 .5rem}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
+@media(max-width:700px){.stats-row{grid-template-columns:1fr 1fr}}
+.stat-box{background:white;border-radius:10px;padding:1rem;box-shadow:0 2px 8px rgba(0,0,0,.06);text-align:center}
+.stat-box .sv{font-size:1.4rem;font-weight:800}
+.stat-box .sl{font-size:.75rem;color:#777;margin-top:2px}
+.filters-bar{background:white;border-radius:12px;padding:1rem 1.2rem;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:1.5rem}
+.filters-bar form{display:flex;gap:.8rem;flex-wrap:wrap;align-items:flex-end}
+.f-group{display:flex;flex-direction:column;gap:3px;flex:1;min-width:140px}
+.f-group label{font-size:.75rem;font-weight:700;color:#555}
+.f-group input,.f-group select{padding:8px 10px;border:2px solid #e0e0e0;border-radius:8px;font-size:.85rem}
+.btn-filter{background:#004D40;color:white;border:none;padding:8px 18px;border-radius:8px;font-size:.85rem;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn-filter:hover{opacity:.88}
+.purchases-grid{display:grid;gap:1rem}
+.purchase-card{background:white;border-radius:12px;padding:1.3rem;box-shadow:0 2px 10px rgba(0,0,0,.06);border-left:4px solid #e0e0e0;transition:box-shadow .2s;text-decoration:none;color:inherit;display:block}
+.purchase-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.12)}
+.purchase-card.suspeita{border-left-color:#E53935}
+.purchase-card.entregue,.purchase-card.pago{border-left-color:#43A047}
+.purchase-card.em_execucao{border-left-color:#1565C0}
+.purchase-card.em_auditoria{border-left-color:#FFB300}
+.p-header{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:.5rem}
+.p-produto{font-size:.95rem;font-weight:700;color:#222;flex:1}
+.p-valor{font-size:1.1rem;font-weight:800;color:#004D40;white-space:nowrap}
+.p-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.5rem}
+.badge{display:inline-block;padding:2px 9px;border-radius:12px;font-size:.7rem;font-weight:600}
+.badge.modal{background:#e8f5e9;color:#1B5E20}
+.badge.status-entregue,.badge.status-pago{background:#e8f5e9;color:#1B5E20}
+.badge.status-em_execucao{background:#e3f2fd;color:#1565C0}
+.badge.status-contratado{background:#f5f5f5;color:#555}
+.badge.status-em_auditoria{background:#fff3e0;color:#E65100}
+.badge.alerta{background:#ffebee;color:#C62828}
+.p-info{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px 12px;font-size:.78rem;color:#555;margin-bottom:.5rem}
+.p-info span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p-info strong{color:#333}
+.suspeita-banner{background:#ffebee;border-radius:6px;padding:.4rem .7rem;font-size:.78rem;color:#C62828;margin-top:.4rem}
+.empty{text-align:center;padding:3rem;color:#999;background:white;border-radius:12px}
+</style>
+
+<div class="comp-hero">
+  <h1>🧾 Compras do Governo</h1>
+  <p>Produto · Comprador · Projeto · Recurso · Data/Hora · Transporte · Como Validar.<br>Cada item comprado com dinheiro público tem rastreabilidade completa.</p>
+</div>
+
+<div class="stats-row">
+  <div class="stat-box"><div class="sv" style="color:#004D40">{{ stats.total }}</div><div class="sl">Compras registradas</div></div>
+  <div class="stat-box"><div class="sv" style="color:#1565C0">R$ {{ '{:,.0f}'.format(stats.valor_total/1e9) }}bi</div><div class="sl">Valor total</div></div>
+  <div class="stat-box"><div class="sv" style="color:#43A047">{{ stats.entregues }}</div><div class="sl">Entregues/Pagas</div></div>
+  <div class="stat-box"><div class="sv" style="color:#E53935">{{ stats.suspeitas }}</div><div class="sl">⚠️ Com suspeita</div></div>
+</div>
+
+<!-- FILTROS -->
+<div class="filters-bar">
+  <form method="GET" action="/compras">
+    <div class="f-group" style="flex:2">
+      <label>Buscar</label>
+      <input name="q" value="{{ q }}" placeholder="produto, órgão, fornecedor...">
+    </div>
+    <div class="f-group">
+      <label>Modalidade</label>
+      <select name="modalidade">
+        <option value="">Todas</option>
+        {% for k,v in modalidades.items() %}<option value="{{ k }}" {% if modalidade==k %}selected{% endif %}>{{ v }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="f-group">
+      <label>Status</label>
+      <select name="status">
+        <option value="">Todos</option>
+        {% for k,v in status_map.items() %}<option value="{{ k }}" {% if status==k %}selected{% endif %}>{{ v }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="f-group">
+      <label>Projeto</label>
+      <select name="projeto">
+        <option value="">Todos</option>
+        {% for p in projetos %}<option value="{{ p.id }}" {% if projeto_id==p.id|string %}selected{% endif %}>{{ p.title[:30] }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="f-group" style="min-width:auto">
+      <label>&nbsp;</label>
+      <select name="suspeita">
+        <option value="">Normal + Suspeitas</option>
+        <option value="1" {% if suspeita %}selected{% endif %}>⚠️ Só suspeitas</option>
+      </select>
+    </div>
+    <button type="submit" class="btn-filter">🔍 Filtrar</button>
+    <a href="/compras" style="padding:8px 14px;border-radius:8px;background:#f5f5f5;color:#555;text-decoration:none;font-size:.82rem;font-weight:600;white-space:nowrap">Limpar</a>
+  </form>
+</div>
+
+<!-- LISTA -->
+{% if purchases %}
+<div class="purchases-grid">
+  {% for p in purchases %}
+  <a href="/compras/{{ p.id }}" class="purchase-card {{ 'suspeita' if p.suspeita_irregularidade else p.status }}">
+    <div class="p-header">
+      <div class="p-produto">
+        {% if p.suspeita_irregularidade %}⚠️ {% endif %}{{ p.produto }}
+      </div>
+      <div class="p-valor">R$ {{ '{:,.0f}'.format(p.valor_total) }}</div>
+    </div>
+    <div class="p-meta">
+      <span class="badge modal">{{ modalidades.get(p.modalidade, p.modalidade) }}</span>
+      <span class="badge status-{{ p.status }}">{{ status_map.get(p.status, p.status) }}</span>
+      {% if p.suspeita_irregularidade %}<span class="badge alerta">⚠️ Irregularidade suspeita</span>{% endif %}
+    </div>
+    <div class="p-info">
+      <span>🏛️ <strong>{{ p.comprador_orgao[:40] }}</strong></span>
+      <span>🏭 <strong>{{ p.fornecedor[:30] }}</strong></span>
+      <span>📅 <strong>{{ p.data_hora[:10] }}</strong></span>
+      <span>📦 {{ p.quantidade }} {{ p.unidade }} × R$ {{ '{:,.2f}'.format(p.valor_unitario) }}</span>
+      <span>💰 {{ p.recurso_orcamentario[:40] }}</span>
+      {% if p.numero_processo %}<span>📋 {{ p.numero_processo }}</span>{% endif %}
+    </div>
+    {% if p.suspeita_irregularidade and p.nota_irregularidade %}
+    <div class="suspeita-banner">{{ p.nota_irregularidade[:120] }}...</div>
+    {% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+  <div style="font-size:3rem">📭</div>
+  <p>Nenhuma compra encontrada para este filtro.</p>
+  <a href="/compras" style="color:#004D40;font-weight:700">Ver todas →</a>
+</div>
+{% endif %}
+{% endblock %}

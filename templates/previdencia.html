@@ -1,0 +1,239 @@
+{% extends 'base.html' %}
+{% block title %}Simulador de Aposentadoria INSS{% endblock %}
+{% block content %}
+<style>
+.prev-hero{background:linear-gradient(135deg,#4A148C,#7B1FA2,#1565C0);color:white;padding:2rem;border-radius:16px;margin-bottom:2rem}
+.prev-hero h1{font-size:1.8rem;margin:0 0 .5rem}
+.prev-hero p{margin:0;opacity:.88;font-size:.95rem}
+.form-card{background:white;border-radius:12px;padding:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,.07);margin-bottom:1.5rem}
+.form-card h3{margin:0 0 1.2rem;color:#333;font-size:1rem}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
+@media(max-width:600px){.form-row{grid-template-columns:1fr}}
+.field label{display:block;font-size:.82rem;font-weight:700;color:#555;margin-bottom:4px}
+.field input,.field select{width:100%;padding:10px 12px;border:2px solid #e0e0e0;border-radius:8px;font-size:.95rem;box-sizing:border-box;transition:border-color .2s}
+.field input:focus,.field select:focus{border-color:#7B1FA2;outline:none}
+.btn-sim{width:100%;background:linear-gradient(135deg,#7B1FA2,#1565C0);color:white;border:none;padding:14px;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;letter-spacing:.5px;margin-top:.5rem}
+.btn-sim:hover{opacity:.92}
+.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem}
+@media(max-width:700px){.result-grid{grid-template-columns:1fr}}
+.regra-card{background:white;border-radius:12px;padding:1.3rem;box-shadow:0 2px 12px rgba(0,0,0,.07);border-top:4px solid #e0e0e0;position:relative}
+.regra-card.melhor{border-top-color:#FFD600;box-shadow:0 4px 20px rgba(255,214,0,.3)}
+.regra-titulo{font-size:.9rem;font-weight:700;color:#333;margin:0 0 .4rem}
+.regra-badge{position:absolute;top:1rem;right:1rem;font-size:.68rem;padding:3px 10px;border-radius:12px;font-weight:700;background:#FFF8E1;color:#F57F17}
+.regra-badge.melhor{background:#FFD600;color:#333}
+.val-grande{font-size:1.6rem;font-weight:800;color:#7B1FA2;margin:.3rem 0}
+.val-sub{font-size:.78rem;color:#777}
+.info-linha{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:.85rem}
+.info-linha:last-child{border-bottom:none}
+.info-linha .k{color:#777}
+.info-linha .v{font-weight:600;color:#333}
+.analise-box{background:white;border-radius:12px;padding:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,.07);margin-bottom:1.5rem}
+.analise-box h3{margin:0 0 1rem;color:#333;font-size:1rem}
+.saldo-positivo{background:#e8f5e9;border-radius:10px;padding:1rem;text-align:center}
+.saldo-negativo{background:#ffebee;border-radius:10px;padding:1rem;text-align:center}
+.saldo-val{font-size:2rem;font-weight:800}
+.saldo-positivo .saldo-val{color:#1B5E20}
+.saldo-negativo .saldo-val{color:#B71C1C}
+.timeline-apos{display:flex;align-items:center;gap:0;overflow-x:auto;padding:.5rem 0;margin:1rem 0}
+.tl-pt{text-align:center;min-width:80px}
+.tl-circle{width:40px;height:40px;border-radius:50%;background:#e0e0e0;display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;margin:0 auto 4px}
+.tl-circle.hoje{background:#1565C0;color:white}
+.tl-circle.apos{background:#FFD600;color:#333}
+.tl-circle.fim{background:#E53935;color:white}
+.tl-label{font-size:.7rem;color:#555;line-height:1.2;max-width:80px}
+.tl-line{flex:1;height:2px;background:#e0e0e0;min-width:30px}
+.alerta-box{border-radius:8px;padding:.7rem 1rem;font-size:.85rem;margin:.4rem 0}
+.alerta-box.positivo{background:#e8f5e9;color:#1B5E20}
+.alerta-box.alerta{background:#fff3e0;color:#E65100}
+.alerta-box.info{background:#e3f2fd;color:#1565C0}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem}
+@media(max-width:600px){.stats-row{grid-template-columns:1fr}}
+.stat-box{background:white;border-radius:10px;padding:1rem;box-shadow:0 2px 8px rgba(0,0,0,.06);text-align:center}
+.stat-box .sv{font-size:1.5rem;font-weight:800}
+.stat-box .sl{font-size:.78rem;color:#777;margin-top:2px}
+.regras-lista{background:white;border-radius:12px;padding:1.3rem;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.regra-item{border-left:3px solid #7B1FA2;padding:.6rem .6rem .6rem 1rem;margin-bottom:.8rem}
+.regra-item h4{margin:0 0 .2rem;font-size:.9rem;color:#333}
+.regra-item p{margin:0;font-size:.82rem;color:#555}
+</style>
+
+<div class="prev-hero">
+  <h1>👴 Simulador de Aposentadoria INSS</h1>
+  <p>Quanto falta? Qual regra é melhor para você? Quanto vai receber — e quanto deu de lucro ou prejuízo ao sistema?</p>
+</div>
+
+<div class="stats-row">
+  <div class="stat-box"><div class="sv" style="color:#7B1FA2">{{ total_sims }}</div><div class="sl">Simulações realizadas</div></div>
+  <div class="stat-box"><div class="sv" style="color:{% if media_saldo >= 0 %}#1B5E20{% else %}#C62828{% endif %}">R$ {{ '{:,.0f}'.format(media_saldo|abs) }}</div><div class="sl">Saldo médio {% if media_saldo >= 0 %}positivo{% else %}negativo{% endif %} ao sistema</div></div>
+  <div class="stat-box"><div class="sv" style="color:#1565C0">37M</div><div class="sl">Beneficiários ativos do INSS</div></div>
+</div>
+
+<!-- FORMULÁRIO -->
+<div class="form-card">
+  <h3>🧮 Calcule sua aposentadoria</h3>
+  <div class="form-row">
+    <div class="field"><label>Sua idade atual</label><input type="number" id="f-idade" min="18" max="70" placeholder="Ex: 42"></div>
+    <div class="field"><label>Sexo</label>
+      <select id="f-sexo"><option value="M">Masculino</option><option value="F">Feminino</option></select></div>
+  </div>
+  <div class="form-row">
+    <div class="field"><label>Salário bruto mensal (R$)</label><input type="number" id="f-salario" min="1412" placeholder="Ex: 4500" step="100"></div>
+    <div class="field"><label>Anos de contribuição ao INSS</label><input type="number" id="f-anos" min="0" max="50" step="0.5" placeholder="Ex: 12.5"></div>
+  </div>
+  <div class="form-row">
+    <div class="field"><label>Estado</label>
+      <select id="f-estado">
+        <option value="SP">SP</option><option value="RJ">RJ</option><option value="MG">MG</option>
+        <option value="RS">RS</option><option value="PR">PR</option><option value="SC">SC</option>
+        <option value="BA">BA</option><option value="CE">CE</option><option value="PE">PE</option>
+        <option value="GO">GO</option><option value="DF">DF</option><option value="PA">PA</option>
+        <option value="AM">AM</option><option value="MA">MA</option><option value="MT">MT</option>
+        <option value="ES">ES</option><option value="PB">PB</option><option value="RN">RN</option>
+        <option value="AL">AL</option><option value="PI">PI</option><option value="SE">SE</option>
+        <option value="MS">MS</option><option value="TO">TO</option><option value="RO">RO</option>
+        <option value="AC">AC</option><option value="AP">AP</option><option value="RR">RR</option>
+      </select>
+    </div>
+    <div class="field" style="display:flex;align-items:flex-end">
+      <button class="btn-sim" onclick="simular()">🔮 Calcular minha aposentadoria</button>
+    </div>
+  </div>
+  <div id="erro-msg" style="display:none;background:#ffebee;color:#C62828;border-radius:8px;padding:.6rem 1rem;font-size:.85rem;margin-top:.5rem"></div>
+</div>
+
+<!-- RESULTADOS (ocultos até simular) -->
+<div id="resultados" style="display:none">
+  <!-- TIMELINE -->
+  <div class="analise-box">
+    <h3>📅 Sua linha do tempo previdenciária</h3>
+    <div class="timeline-apos" id="timeline"></div>
+    <div id="destaque-regra" style="text-align:center;margin-top:.5rem;font-size:.88rem;color:#555"></div>
+  </div>
+
+  <!-- CARDS DAS REGRAS -->
+  <div class="result-grid" id="regras-cards"></div>
+
+  <!-- ANÁLISE FINANCEIRA VITALÍCIA -->
+  <div class="analise-box">
+    <h3>💰 Análise Financeira Vitalícia</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem" id="analise-vals"></div>
+    <div id="saldo-box"></div>
+    <div class="alerta-box info" style="margin-top:1rem">
+      ℹ️ <strong>Como o sistema funciona:</strong> Você paga INSS hoje para financiar quem já se aposentou. Quando você se aposentar, a próxima geração financia você. O equilíbrio depende de quantos trabalhadores existem para cada aposentado.
+    </div>
+    <div class="alerta-box alerta">
+      ⚠️ <strong>Realidade do INSS:</strong> O sistema tem déficit de ~R$ 170 bilhões/ano. O Tesouro Nacional cobre a diferença. Isso significa que parte do seu imposto paga aposentadorias mesmo antes de você contribuir.
+    </div>
+  </div>
+</div>
+
+<!-- REGRAS EXPLICADAS -->
+<div class="regras-lista" style="margin-top:1.5rem">
+  <h3 style="margin:0 0 1rem;font-size:.95rem;color:#333;border-bottom:2px solid #f0f0f0;padding-bottom:.5rem">📜 Regras de Aposentadoria (Pós-Reforma 2019)</h3>
+  {% for key, r in regras.items() %}
+  <div class="regra-item">
+    <h4>{{ r.nome }}</h4>
+    <p>{{ r.desc }}<br>
+    {% if r.get('requisitos_h') %}Homem: {{ r.requisitos_h.idade }} anos + {{ r.requisitos_h.contrib_anos }} anos de contribuição. Mulher: {{ r.requisitos_m.idade }} anos + {{ r.requisitos_m.contrib_anos }} anos de contribuição.{% endif %}
+    {% if r.get('pontos_h_2024') %}Pontos 2024: {{ r.pontos_h_2024 }} (H) / {{ r.pontos_m_2024 }} (M) + contribuição mínima {{ r.contrib_min_h }}H/{{ r.contrib_min_m }}M anos.{% endif %}
+    <br><em>{{ r.calculo }}</em></p>
+  </div>
+  {% endfor %}
+  <div class="alerta-box info" style="margin-top:.5rem">
+    ℹ️ Estes cálculos são estimativas educacionais. Para cálculo oficial, acesse <strong>meu.inss.gov.br</strong> ou procure um especialista em previdência.
+  </div>
+</div>
+
+<script>
+function fmt(v){ return 'R$ ' + parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtN(v){ return parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:1}); }
+
+async function simular(){
+  const idade = parseInt(document.getElementById('f-idade').value);
+  const sexo = document.getElementById('f-sexo').value;
+  const salario = parseFloat(document.getElementById('f-salario').value);
+  const anos_contrib = parseFloat(document.getElementById('f-anos').value);
+  const estado = document.getElementById('f-estado').value;
+
+  const erros = [];
+  if(!idade || idade<18||idade>70) erros.push('Idade inválida (18-70)');
+  if(!salario||salario<1412) erros.push('Salário deve ser ≥ R$ 1.412 (mínimo)');
+  if(isNaN(anos_contrib)||anos_contrib<0) erros.push('Anos de contribuição inválido');
+
+  const errEl = document.getElementById('erro-msg');
+  if(erros.length){ errEl.textContent = '⚠️ ' + erros.join('. '); errEl.style.display='block'; return; }
+  errEl.style.display='none';
+
+  const res = await fetch('/previdencia/simular',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({idade,sexo,salario,anos_contrib,estado})
+  });
+  const d = await res.json();
+  if(d.error){ errEl.textContent='⚠️ '+d.error; errEl.style.display='block'; return; }
+
+  // Mostra resultados
+  document.getElementById('resultados').style.display='block';
+
+  // Timeline
+  const ia = d.analise.idade_aposentadoria;
+  const ev = d.analise.expectativa_vida;
+  const anos_r = d.analise.anos_recebendo;
+  document.getElementById('timeline').innerHTML = `
+    <div class="tl-pt"><div class="tl-circle hoje">${idade}</div><div class="tl-label">Hoje</div></div>
+    <div class="tl-line"></div>
+    <div class="tl-pt"><div class="tl-circle apos">${Math.round(ia)}</div><div class="tl-label">Aposentadoria<br>${fmtN(d.analise.idade_aposentadoria-idade)} anos</div></div>
+    <div class="tl-line"></div>
+    <div class="tl-pt"><div class="tl-circle fim">${ev}</div><div class="tl-label">Expectativa de vida<br>${fmtN(anos_r)} anos recebendo</div></div>`;
+
+  const melhorNome = d.regras[d.melhor_regra].nome;
+  document.getElementById('destaque-regra').innerHTML = `✅ Melhor opção para você: <strong>${melhorNome}</strong>`;
+
+  // Cards das regras
+  const rc = document.getElementById('regras-cards');
+  rc.innerHTML = '';
+  for(const [key, regra] of Object.entries(d.regras)){
+    const isMelhor = key === d.melhor_regra;
+    rc.innerHTML += `<div class="regra-card ${isMelhor?'melhor':''}">
+      ${isMelhor ? '<span class="regra-badge melhor">🏆 Melhor</span>' : ''}
+      <div class="regra-titulo">${regra.nome}</div>
+      ${regra.elegivel_hoje ? '<div class="alerta-box positivo">✅ Você já pode se aposentar por esta regra!</div>' : ''}
+      ${regra.alerta && !regra.elegivel_hoje ? `<div class="alerta-box alerta">${regra.alerta}</div>` : ''}
+      <div class="val-grande">${fmt(regra.beneficio_mensal)}<small style="font-size:.6em;color:#777">/mês</small></div>
+      <div class="val-sub">Benefício estimado</div>
+      <div style="margin-top:.8rem">
+        <div class="info-linha"><span class="k">Falta</span><span class="v">${fmtN(regra.anos_faltam)} anos</span></div>
+        <div class="info-linha"><span class="k">Idade na aposentadoria</span><span class="v">${fmtN(regra.idade_aposentadoria)} anos</span></div>
+        <div class="info-linha"><span class="k">Contrib. na aposentadoria</span><span class="v">${fmtN(regra.contrib_na_aposentadoria)} anos</span></div>
+        ${regra.pontos_necessarios ? `<div class="info-linha"><span class="k">Pontos necessários</span><span class="v">${regra.pontos_necessarios}</span></div>
+        <div class="info-linha"><span class="k">Seus pontos hoje</span><span class="v">${fmtN(regra.pontos_atuais)}</span></div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  // Análise vitalícia
+  const a = d.analise;
+  document.getElementById('analise-vals').innerHTML = `
+    <div style="text-align:center;background:#f5f5f5;border-radius:8px;padding:1rem">
+      <div style="font-size:1.3rem;font-weight:800;color:#7B1FA2">${fmt(a.total_contribuido)}</div>
+      <div style="font-size:.78rem;color:#777;margin-top:2px">Total contribuído (estimado)</div>
+    </div>
+    <div style="text-align:center;background:#f5f5f5;border-radius:8px;padding:1rem">
+      <div style="font-size:1.3rem;font-weight:800;color:#1565C0">${fmt(a.total_recebera)}</div>
+      <div style="font-size:.78rem;color:#777;margin-top:2px">Total que receberá (${fmtN(a.anos_recebendo)} anos)</div>
+    </div>
+    <div style="text-align:center;background:#f5f5f5;border-radius:8px;padding:1rem">
+      <div style="font-size:1.3rem;font-weight:800;color:#${a.saldo_liquido>=0?'1B5E20':'C62828'}">${fmt(Math.abs(a.saldo_liquido))}</div>
+      <div style="font-size:.78rem;color:#777;margin-top:2px">Saldo ${a.saldo_liquido>=0?'✅ positivo':'🔴 negativo'} ao INSS</div>
+    </div>`;
+
+  const saldoBox = document.getElementById('saldo-box');
+  if(a.saldo_liquido >= 0){
+    saldoBox.innerHTML = `<div class="saldo-positivo"><div class="saldo-val">+${fmt(a.saldo_liquido)}</div><div style="font-size:.85rem;margin-top:.3rem">Você receberá mais do que contribuiu — o sistema beneficia você</div></div>`;
+  } else {
+    saldoBox.innerHTML = `<div class="saldo-negativo"><div class="saldo-val">-${fmt(Math.abs(a.saldo_liquido))}</div><div style="font-size:.85rem;margin-top:.3rem">Você contribuirá mais do que receberá — ajuda a financiar outras pessoas</div></div>`;
+  }
+
+  document.getElementById('resultados').scrollIntoView({behavior:'smooth'});
+}
+</script>
+{% endblock %}

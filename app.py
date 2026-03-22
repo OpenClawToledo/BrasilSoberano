@@ -643,6 +643,247 @@ def votar_denuncia(vid):
     return jsonify(dict(row))
 
 
+# ─── PREVIDÊNCIA — Simulador de Aposentadoria ────────────────────────────────
+
+REGRAS_APOS = {
+    'por_idade': {
+        'nome': 'Aposentadoria por Idade',
+        'desc': 'Regra principal após Reforma 2019. Mais simples.',
+        'requisitos_h': {'idade': 65, 'contrib_anos': 20},
+        'requisitos_m': {'idade': 62, 'contrib_anos': 15},
+        'calculo': 'Média de 100% das contribuições desde jul/1994. Benefício = 60% + 2% por ano acima do mínimo.',
+    },
+    'pontos': {
+        'nome': 'Regra de Pontos (Transição)',
+        'desc': 'Soma da idade + anos de contribuição. Melhor para quem tem muito tempo de serviço.',
+        'pontos_h_2024': 99,  # sobe 1 por ano até 105
+        'pontos_m_2024': 96,  # sobe 1 por ano até 100
+        'contrib_min_h': 35,
+        'contrib_min_m': 30,
+        'calculo': 'Benefício = 60% + 2% por ano acima do mínimo (35H/30M).',
+    },
+    'incapacidade': {
+        'nome': 'Aposentadoria por Incapacidade Permanente',
+        'desc': 'Para quem não consegue mais trabalhar por doença ou acidente.',
+        'calculo': '100% da média das contribuições. Exige perícia médica do INSS.',
+    },
+}
+
+
+def calcular_aposentadoria(idade, sexo, salario, anos_contrib):
+    """Calcula cenários de aposentadoria para o cidadão."""
+    results = {}
+    eh_homem = sexo.lower() in ('m', 'masculino', 'h')
+
+    # Média do salário de benefício estimada (simplificado)
+    # Assume contribuição constante sobre salário atual
+    sal_beneficio_base = salario * 0.95  # ajuste para teto/índice
+
+    def calc_beneficio(anos_acima_min, anos_min):
+        pct = 0.60 + (max(0, anos_acima_min) * 0.02)
+        return min(sal_beneficio_base * pct, 7786.02)  # teto INSS 2024
+
+    # ── Regra 1: Por Idade ───────────────────────────────────────────────────
+    idade_ret_1 = 65 if eh_homem else 62
+    contrib_min_1 = 20 if eh_homem else 15
+    anos_faltam_idade = max(0, idade_ret_1 - idade)
+    anos_faltam_contrib_1 = max(0, contrib_min_1 - anos_contrib)
+    anos_faltam_1 = max(anos_faltam_idade, anos_faltam_contrib_1)
+    anos_acima_1 = max(0, (anos_contrib + anos_faltam_1) - contrib_min_1)
+    beneficio_1 = calc_beneficio(anos_acima_1, contrib_min_1)
+    results['por_idade'] = {
+        'nome': 'Aposentadoria por Idade',
+        'anos_faltam': round(anos_faltam_1, 1),
+        'idade_aposentadoria': idade + anos_faltam_1,
+        'contrib_na_aposentadoria': anos_contrib + anos_faltam_1,
+        'beneficio_mensal': round(beneficio_1, 2),
+        'requisito_bloqueante': 'Idade' if anos_faltam_idade >= anos_faltam_contrib_1 else 'Contribuição',
+        'elegivel_hoje': anos_faltam_1 == 0,
+        'alerta': None if beneficio_1 >= 1412 else '⚠️ Benefício próximo ao salário mínimo',
+    }
+
+    # ── Regra 2: Pontos (Transição) ──────────────────────────────────────────
+    pontos_necessarios = 99 if eh_homem else 96  # 2024
+    contrib_min_2 = 35 if eh_homem else 30
+    pontos_atuais = idade + anos_contrib
+
+    if pontos_atuais >= pontos_necessarios and anos_contrib >= contrib_min_2:
+        anos_faltam_2 = 0
+    else:
+        deficit_pontos = max(0, pontos_necessarios - pontos_atuais)
+        deficit_contrib = max(0, contrib_min_2 - anos_contrib)
+        # Cada ano adiciona 2 pontos (1 de idade + 1 de contribuição)
+        anos_faltam_2 = max(deficit_pontos / 2, deficit_contrib)
+
+    anos_acima_2 = max(0, (anos_contrib + anos_faltam_2) - contrib_min_2)
+    beneficio_2 = calc_beneficio(anos_acima_2, contrib_min_2)
+    results['pontos'] = {
+        'nome': 'Regra de Pontos (Transição 2024)',
+        'pontos_necessarios': pontos_necessarios,
+        'pontos_atuais': round(pontos_atuais, 1),
+        'anos_faltam': round(anos_faltam_2, 1),
+        'idade_aposentadoria': round(idade + anos_faltam_2, 1),
+        'contrib_na_aposentadoria': round(anos_contrib + anos_faltam_2, 1),
+        'beneficio_mensal': round(beneficio_2, 2),
+        'elegivel_hoje': anos_faltam_2 == 0,
+        'alerta': '✅ Melhor opção' if beneficio_2 > beneficio_1 else None,
+    }
+
+    # ── Melhor opção ──────────────────────────────────────────────────────────
+    melhor = 'pontos' if results['pontos']['beneficio_mensal'] > results['por_idade']['beneficio_mensal'] else 'por_idade'
+    results[melhor]['alerta'] = '🏆 Melhor benefício'
+
+    # ── Análise financeira vitalícia ──────────────────────────────────────────
+    anos_faltam_melhor = results[melhor]['anos_faltam']
+    beneficio_melhor = results[melhor]['beneficio_mensal']
+
+    # Total contribuído até aposentadoria
+    contribuicao_mensal = salario * 0.14  # alíquota máxima simplificada
+    meses_restantes = anos_faltam_melhor * 12
+    total_contrib_restante = contribuicao_mensal * meses_restantes
+    total_contrib_passado = (anos_contrib * 12) * (salario * 0.12)  # estimado
+    total_contribuido = total_contrib_passado + total_contrib_restante
+
+    # Expectativa de vida: 75 (H) / 79 (M)
+    exp_vida = 75 if eh_homem else 79
+    idade_apos = idade + anos_faltam_melhor
+    anos_recebendo = max(0, exp_vida - idade_apos)
+    total_recebera = beneficio_melhor * 12 * anos_recebendo
+
+    saldo = total_recebera - total_contribuido
+
+    return {
+        'regras': results,
+        'melhor_regra': melhor,
+        'analise': {
+            'total_contribuido': round(total_contribuido, 2),
+            'total_recebera': round(total_recebera, 2),
+            'saldo_liquido': round(saldo, 2),
+            'anos_recebendo': round(anos_recebendo, 1),
+            'idade_aposentadoria': round(idade_apos, 1),
+            'expectativa_vida': exp_vida,
+        }
+    }
+
+
+@app.route('/previdencia')
+def previdencia():
+    # Dados agregados das simulações
+    total_sims = query_db('SELECT COUNT(*) as c FROM inss_simulations', one=True)['c']
+    media_saldo = query_db('SELECT AVG(saldo_liquido) as s FROM inss_simulations', one=True)['s'] or 0
+    return render_template('previdencia.html',
+                           regras=REGRAS_APOS,
+                           total_sims=total_sims,
+                           media_saldo=round(media_saldo, 2))
+
+
+@app.route('/previdencia/simular', methods=['POST'])
+def previdencia_simular():
+    data = request.get_json() or {}
+    try:
+        idade = int(data.get('idade', 0))
+        sexo = data.get('sexo', 'M')
+        salario = float(data.get('salario', 0))
+        anos_contrib = float(data.get('anos_contrib', 0))
+        state_code = data.get('estado', 'SP')
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Dados inválidos'}), 400
+
+    if not (18 <= idade <= 70) or salario <= 0 or anos_contrib < 0:
+        return jsonify({'error': 'Verifique os dados informados'}), 400
+
+    result = calcular_aposentadoria(idade, sexo, salario, anos_contrib)
+
+    # Salvar simulação
+    melhor = result['melhor_regra']
+    melhor_r = result['regras'][melhor]
+    analise = result['analise']
+    get_db().execute("""
+        INSERT INTO inss_simulations (state_code,idade,sexo,salario,anos_contribuicao,
+        regra_ativa,anos_faltam,beneficio_estimado,total_contribuido,total_recebera,saldo_liquido)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+        (state_code, idade, sexo, salario, anos_contrib,
+         melhor, melhor_r['anos_faltam'], melhor_r['beneficio_mensal'],
+         analise['total_contribuido'], analise['total_recebera'], analise['saldo_liquido']))
+    get_db().commit()
+
+    return jsonify(result)
+
+
+# ─── COMPRAS DO GOVERNO ───────────────────────────────────────────────────────
+
+MODALIDADES = {
+    'pregao_eletronico':      '🖥️ Pregão Eletrônico',
+    'dispensa_licitacao':     '⚡ Dispensa de Licitação',
+    'tomada_precos':          '📋 Tomada de Preços',
+    'concorrencia':           '🏆 Concorrência',
+    'concorrencia_internacional': '🌍 Concorrência Internacional',
+    'ata_registro_precos':    '📑 Ata de Registro de Preços',
+    'inexigibilidade':        '🔒 Inexigibilidade',
+}
+STATUS_COMPRA = {
+    'contratado':    '📝 Contratado',
+    'em_execucao':   '🔄 Em Execução',
+    'entregue':      '✅ Entregue',
+    'pago':          '💰 Pago',
+    'cancelado':     '❌ Cancelado',
+    'em_auditoria':  '🔍 Em Auditoria',
+}
+
+
+@app.route('/compras')
+def compras():
+    q = request.args.get('q', '')
+    modalidade = request.args.get('modalidade', '')
+    status = request.args.get('status', '')
+    suspeita = request.args.get('suspeita', '')
+    projeto_id = request.args.get('projeto', '')
+
+    query = 'SELECT * FROM government_purchases WHERE 1=1'
+    args = []
+    if q:
+        query += ' AND (produto LIKE ? OR comprador_orgao LIKE ? OR fornecedor LIKE ? OR numero_processo LIKE ?)'
+        args += [f'%{q}%']*4
+    if modalidade:
+        query += ' AND modalidade=?'; args.append(modalidade)
+    if status:
+        query += ' AND status=?'; args.append(status)
+    if suspeita:
+        query += ' AND suspeita_irregularidade=1'
+    if projeto_id:
+        query += ' AND projeto_id=?'; args.append(projeto_id)
+    query += ' ORDER BY data_hora DESC'
+
+    purchases = query_db(query, args)
+
+    # Stats
+    stats = {
+        'total': query_db('SELECT COUNT(*) as c FROM government_purchases', one=True)['c'],
+        'valor_total': query_db('SELECT SUM(valor_total) as s FROM government_purchases', one=True)['s'] or 0,
+        'suspeitas': query_db('SELECT COUNT(*) as c FROM government_purchases WHERE suspeita_irregularidade=1', one=True)['c'],
+        'entregues': query_db("SELECT COUNT(*) as c FROM government_purchases WHERE status IN ('entregue','pago')", one=True)['c'],
+    }
+    projetos = query_db('SELECT id, title FROM projects ORDER BY title')
+    return render_template('compras.html',
+                           purchases=purchases, stats=stats,
+                           modalidades=MODALIDADES, status_map=STATUS_COMPRA,
+                           projetos=projetos,
+                           q=q, modalidade=modalidade, status=status,
+                           suspeita=suspeita, projeto_id=projeto_id)
+
+
+@app.route('/compras/<int:pid>')
+def compra_detalhe(pid):
+    p = query_db('SELECT * FROM government_purchases WHERE id=?', (pid,), one=True)
+    if not p:
+        return render_template('404.html'), 404
+    projeto = None
+    if p['projeto_id']:
+        projeto = query_db('SELECT * FROM projects WHERE id=?', (p['projeto_id'],), one=True)
+    return render_template('compra_detalhe.html', p=p, projeto=projeto,
+                           modalidades=MODALIDADES, status_map=STATUS_COMPRA)
+
+
 # ─── RASTREABILIDADE FISCAL ──────────────────────────────────────────────────
 
 @app.route('/rastreabilidade')
