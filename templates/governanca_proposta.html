@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% block title %}Nova Proposta de Mudança — Brasil Soberano{% endblock %}
+{% block content %}
+<style>
+.prop-hero{background:linear-gradient(135deg,#4A148C,#1565C0);color:white;padding:2rem;border-radius:16px;margin-bottom:2rem}
+.prop-hero h1{font-size:1.6rem;margin:0 0 .4rem}
+.card{background:white;border-radius:12px;padding:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,.07)}
+.field{margin-bottom:1.2rem}
+.field label{display:block;font-size:.82rem;font-weight:700;color:#555;margin-bottom:4px}
+.field input,.field select,.field textarea{width:100%;padding:10px 12px;border:2px solid #e0e0e0;border-radius:8px;font-size:.9rem;box-sizing:border-box;transition:border-color .2s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:#4A148C;outline:none}
+.gravidade-sel{display:grid;grid-template-columns:repeat(5,1fr);gap:.6rem;margin-bottom:.5rem}
+@media(max-width:600px){.gravidade-sel{grid-template-columns:1fr 1fr}}
+.g-opt{border:2px solid #e0e0e0;border-radius:10px;padding:.8rem;text-align:center;cursor:pointer;transition:all .2s}
+.g-opt:hover{transform:translateY(-2px)}
+.g-opt.selected{border-width:3px}
+.g-opt .g-e{font-size:1.5rem}
+.g-opt .g-n{font-size:.72rem;font-weight:700}
+.g-opt .g-d{font-size:.65rem;color:#777;margin-top:2px}
+.consequencias{background:#fff3e0;border-left:4px solid #FF6F00;border-radius:0 8px 8px 0;padding:1rem;margin:1rem 0;font-size:.85rem;color:#E65100}
+.btn-submit{width:100%;background:linear-gradient(135deg,#4A148C,#1565C0);color:white;border:none;padding:14px;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:1rem}
+.btn-submit:hover{opacity:.92}
+.resultado-box{display:none;background:#e8f5e9;border-radius:10px;padding:1.2rem;margin-top:1rem;text-align:center;color:#1B5E20;font-weight:600}
+</style>
+
+<a href="/governanca" style="display:inline-flex;align-items:center;gap:6px;color:#555;text-decoration:none;font-size:.88rem;margin-bottom:1rem">← Voltar para Governança</a>
+
+<div class="prop-hero">
+  <h1>📋 Nova Proposta de Mudança</h1>
+  <p>Qualquer cidadão pode propor mudanças na plataforma. A aprovação exige 100% dos votos dentro do prazo definido pela gravidade.</p>
+</div>
+
+<div class="card">
+  <div class="field">
+    <label>Título da proposta *</label>
+    <input id="f-titulo" placeholder="Ex: Adicionar mapa interativo de obras públicas">
+  </div>
+  <div class="field">
+    <label>Descrição detalhada *</label>
+    <textarea id="f-desc" rows="5" placeholder="Descreva o que vai mudar, por que é necessário e como impacta os cidadãos..."></textarea>
+  </div>
+  <div class="field">
+    <label>Tipo de mudança</label>
+    <select id="f-tipo">
+      <option value="funcao">🔧 Nova função / melhoria</option>
+      <option value="regra">⚖️ Regra de governança</option>
+      <option value="regra_constitucional">⛔ Regra constitucional do app</option>
+      <option value="correcao">🐛 Correção de bug</option>
+      <option value="conteudo">📝 Atualização de conteúdo</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>Gravidade (define duração + zona de notificação) *</label>
+    <div class="gravidade-sel">
+      {% for g, cfg in gravidade_cfg.items() %}
+      <div class="g-opt {% if g==2 %}selected{% endif %}" id="gopt-{{ g }}" onclick="selecionarGravidade({{ g }})" style="border-color:{{ cfg.cor }}20{% if g==2 %};border-color:{{ cfg.cor }};background:{{ cfg.cor }}10{% endif %}">
+        <div class="g-e">{{ cfg.emoji }}</div>
+        <div class="g-n" style="color:{{ cfg.cor }}">{{ g }}. {{ cfg.nome }}</div>
+        <div class="g-d">{{ '%.0f'|format(cfg.duracao_horas) }}h | {{ cfg.zona }}<br>quorum {{ cfg.quorum }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <input type="hidden" id="f-gravidade" value="2">
+  </div>
+  <div class="consequencias" id="consequencias">
+    ⏱️ Esta proposta abrirá votação de <strong>24 horas</strong>, notificando cidadãos da zona <strong>cidade</strong>. Quorum mínimo: <strong>10 votos</strong>. 100% SIM necessário.
+  </div>
+  <div class="field">
+    <label>Função afetada (arquivo/módulo)</label>
+    <input id="f-funcao" placeholder="Ex: templates/feed.html, app.py (rota /feed)">
+  </div>
+  <div class="field">
+    <label>Link do PR/commit no GitHub (opcional)</label>
+    <input id="f-pr" type="url" placeholder="https://github.com/OpenClawToledo/BrasilSoberano/pull/...">
+  </div>
+  <div class="field">
+    <label>Estado (se for mudança estadual)</label>
+    <select id="f-estado">
+      <option value="">Todos (federal)</option>
+      <option>SP</option><option>RJ</option><option>MG</option><option>RS</option>
+      <option>PR</option><option>SC</option><option>BA</option><option>CE</option>
+      <option>PE</option><option>GO</option><option>DF</option><option>PA</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>Seu nome / identificação (opcional)</label>
+    <input id="f-proponente" placeholder="Cidadão Anônimo">
+  </div>
+  <button class="btn-submit" onclick="submeter()">🚀 Abrir Votação Agora</button>
+  <div class="resultado-box" id="resultado"></div>
+</div>
+
+<script>
+const GCFG = {{ gravidade_cfg|tojson }};
+
+function selecionarGravidade(g){
+  document.getElementById('f-gravidade').value = g;
+  document.querySelectorAll('.g-opt').forEach(el => {
+    const gn = parseInt(el.id.split('-')[1]);
+    const cfg = GCFG[gn];
+    el.style.borderColor = gn === g ? cfg.cor : cfg.cor+'20';
+    el.style.background = gn === g ? cfg.cor+'15' : '';
+    el.style.borderWidth = gn === g ? '3px' : '2px';
+  });
+  const cfg = GCFG[g];
+  document.getElementById('consequencias').innerHTML =
+    `⏱️ Esta proposta abrirá votação de <strong>${cfg.duracao_horas}h</strong>, notificando cidadãos da zona <strong>${cfg.zona}</strong>. Quorum mínimo: <strong>${cfg.quorum} votos</strong>. 100% SIM necessário.`;
+}
+
+async function submeter(){
+  const titulo = document.getElementById('f-titulo').value;
+  const desc = document.getElementById('f-desc').value;
+  if(!titulo || !desc){ alert('Título e descrição são obrigatórios.'); return; }
+  const data = {
+    titulo, descricao: desc,
+    tipo: document.getElementById('f-tipo').value,
+    gravidade: document.getElementById('f-gravidade').value,
+    proponente: document.getElementById('f-proponente').value || 'Cidadão Anônimo',
+    github_pr: document.getElementById('f-pr').value,
+    funcao_afetada: document.getElementById('f-funcao').value,
+    estado: document.getElementById('f-estado').value,
+  };
+  const res = await fetch('/governanca/proposta/nova',{
+    method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body: new URLSearchParams(data)
+  });
+  const d = await res.json();
+  if(d.ok){
+    const box = document.getElementById('resultado');
+    box.style.display='block';
+    box.textContent = '✅ Votação aberta! Redirecionando...';
+    setTimeout(()=>{ window.location.href = '/governanca/voto/' + d.voting_event_id; }, 1200);
+  }
+}
+</script>
+{% endblock %}

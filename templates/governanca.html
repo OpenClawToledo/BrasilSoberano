@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+{% block title %}Governança Aberta — Brasil Soberano{% endblock %}
+{% block content %}
+<style>
+.gov-hero{background:linear-gradient(135deg,#4A148C,#6A1B9A,#1565C0);color:white;padding:2rem;border-radius:16px;margin-bottom:2rem}
+.gov-hero h1{font-size:1.8rem;margin:0 0 .5rem}
+.gov-hero p{margin:0;opacity:.88;font-size:.95rem}
+.regra-card{background:white;border:3px solid #4A148C;border-radius:16px;padding:1.5rem;margin-bottom:1.5rem;text-align:center}
+.regra-card h2{font-size:2.5rem;margin:0 0 .3rem}
+.regra-card p{font-size:.9rem;color:#555;margin:.3rem 0}
+.gravidade-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:.8rem;margin-bottom:2rem}
+@media(max-width:700px){.gravidade-grid{grid-template-columns:1fr 1fr}}
+.g-card{border-radius:12px;padding:1rem;text-align:center;color:white}
+.g-card .g-emoji{font-size:1.8rem}
+.g-card .g-nome{font-size:.8rem;font-weight:700;margin:.3rem 0}
+.g-card .g-det{font-size:.7rem;opacity:.9}
+.section-title{font-size:1.1rem;font-weight:700;margin:1.5rem 0 .8rem;color:#333;border-left:4px solid #4A148C;padding-left:.8rem;display:flex;justify-content:space-between;align-items:center}
+.voto-card{background:white;border-radius:12px;padding:1.3rem;box-shadow:0 2px 12px rgba(0,0,0,.07);margin-bottom:1rem;border-left:5px solid #e0e0e0;text-align:none;text-decoration:none;color:inherit;display:block;transition:box-shadow .2s}
+.voto-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.12)}
+.voto-card.ao_vivo{border-left-color:#E53935;animation:pulse-border 2s infinite}
+@keyframes pulse-border{0%,100%{border-left-color:#E53935}50%{border-left-color:#FF8A80}}
+.voto-card.aprovada{border-left-color:#43A047}
+.voto-card.rejeitada{border-left-color:#9E9E9E}
+.voto-card.proposta{border-left-color:#FFB300}
+.v-header{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:.5rem}
+.v-titulo{font-size:.93rem;font-weight:700;color:#222;flex:1}
+.v-badge{font-size:.72rem;padding:3px 10px;border-radius:12px;font-weight:700;white-space:nowrap}
+.live-dot{display:inline-block;width:8px;height:8px;background:#E53935;border-radius:50%;animation:blink 1s infinite;margin-right:4px}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.v-meta{font-size:.78rem;color:#777;margin-bottom:.6rem;display:flex;gap:8px;flex-wrap:wrap}
+.progress-row{display:flex;align-items:center;gap:8px;margin:.4rem 0}
+.progress-track{flex:1;background:#f0f0f0;border-radius:20px;height:10px;overflow:hidden}
+.progress-fill{height:100%;border-radius:20px;background:linear-gradient(90deg,#43A047,#66BB6A);transition:width .4s}
+.progress-fill.nao{background:linear-gradient(90deg,#E53935,#EF9A9A)}
+.quorum-badge{font-size:.72rem;padding:2px 8px;border-radius:10px;font-weight:600}
+.quorum-ok{background:#e8f5e9;color:#1B5E20}
+.quorum-nok{background:#fff3e0;color:#E65100}
+.notif-item{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:.82rem}
+.notif-item:last-child{border-bottom:none}
+.btn-nova{background:#4A148C;color:white;border:none;padding:8px 18px;border-radius:8px;font-size:.85rem;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn-nova:hover{opacity:.88}
+</style>
+
+<div class="gov-hero">
+  <h1>🏛️ Governança Aberta</h1>
+  <p>O Brasil Soberano governa a si mesmo pelas mesmas regras que ensina. Cada mudança é votada ao vivo pela comunidade.</p>
+</div>
+
+<!-- REGRA FUNDAMENTAL -->
+<div class="regra-card">
+  <h2>100%</h2>
+  <div style="font-size:1.1rem;font-weight:700;color:#4A148C;margin-bottom:.5rem">Aprovação necessária para qualquer mudança</div>
+  <p>Um único voto NÃO encerra e rejeita a proposta imediatamente.<br>
+  A votação é <strong>ao vivo</strong> e <strong>pública</strong>. Todos os cidadãos da zona afetada são notificados.<br>
+  A duração e o quorum mínimo dependem da <strong>gravidade</strong> da mudança.</p>
+</div>
+
+<!-- ESCALA DE GRAVIDADE -->
+<div class="section-title">⚖️ Escala de Gravidade</div>
+<div class="gravidade-grid">
+  {% for g, cfg in gravidade_cfg.items() %}
+  <div class="g-card" style="background:{{ cfg.cor }}">
+    <div class="g-emoji">{{ cfg.emoji }}</div>
+    <div class="g-nome">{{ g }}. {{ cfg.nome }}</div>
+    <div class="g-det">{{ '%.0f'|format(cfg.duracao_horas) }}h | {{ cfg.zona }} | quorum {{ cfg.quorum }}</div>
+    <div class="g-det" style="margin-top:2px;font-size:.65rem">{{ cfg.desc }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- VOTAÇÕES AO VIVO -->
+{% if ao_vivo %}
+<div class="section-title">
+  <span><span class="live-dot"></span> AO VIVO — Votações em andamento</span>
+</div>
+{% for c in ao_vivo %}
+<a href="/governanca/voto/{{ c.ve_id }}" class="voto-card ao_vivo">
+  <div class="v-header">
+    <div class="v-titulo">{{ c.gcfg.emoji }} {{ c.titulo }}</div>
+    <span class="v-badge" style="background:{{ c.gcfg.cor }}20;color:{{ c.gcfg.cor }}">{{ c.gcfg.nome }}</span>
+  </div>
+  <div class="v-meta">
+    <span><span class="live-dot"></span> AO VIVO</span>
+    <span>⏰ Restam {{ c.tempo_restante }}</span>
+    <span>👥 {{ '{:,}'.format(c.cidadaos_notificados) }} notificados</span>
+    <span>📍 Zona: {{ c.zona }}</span>
+  </div>
+  <div class="progress-row">
+    <span style="font-size:.78rem;color:#555;min-width:30px">SIM</span>
+    <div class="progress-track">
+      <div class="progress-fill" style="width:{{ c.pct_sim }}%"></div>
+    </div>
+    <span style="font-size:.78rem;font-weight:700;color:#43A047">{{ c.pct_sim }}%</span>
+    <span class="quorum-badge {{ 'quorum-ok' if c.total_votos >= c.quorum_minimo else 'quorum-nok' }}">
+      {{ c.total_votos }}/{{ c.quorum_minimo }} quorum
+    </span>
+  </div>
+  <div style="font-size:.78rem;color:#555;margin-top:.3rem">
+    ✅ {{ c.votos_sim or 0 }} sim &nbsp;|&nbsp; ❌ {{ c.votos_nao or 0 }} não &nbsp;|&nbsp; — {{ c.votos_abstencao or 0 }} abstenção
+  </div>
+</a>
+{% endfor %}
+{% endif %}
+
+<!-- PROPOSTAS ABERTAS -->
+<div class="section-title">
+  <span>📋 Propostas Abertas</span>
+  <a href="/governanca/proposta/nova" class="btn-nova">+ Nova Proposta</a>
+</div>
+{% for c in propostas %}
+<div class="voto-card proposta">
+  <div class="v-header">
+    <div class="v-titulo">{{ c.gcfg.emoji }} {{ c.titulo }}</div>
+    <span class="v-badge" style="background:#FFF8E1;color:#F57F17">Proposta</span>
+  </div>
+  <div class="v-meta">
+    <span>📅 {{ c.created_at[:10] }}</span>
+    <span>🧑 {{ c.proponente }}</span>
+    <span>⚖️ Gravidade {{ c.gravidade }}: {{ c.gcfg.nome }}</span>
+    <span>📍 {{ c.zona }}</span>
+  </div>
+  <div style="font-size:.85rem;color:#555">{{ c.descricao[:120] }}{% if c.descricao|length > 120 %}...{% endif %}</div>
+  <div style="font-size:.78rem;color:#777;margin-top:.3rem">
+    Quando aprovada para votação: {{ '%.0f'|format(c.gcfg.duracao_horas) }}h de votação, quorum {{ c.gcfg.quorum }}, notifica {{ c.gcfg.zona }}
+  </div>
+</div>
+{% endfor %}
+
+<!-- ENCERRADAS -->
+{% if encerradas %}
+<div class="section-title">🏁 Votações Encerradas</div>
+{% for c in encerradas %}
+<a href="/governanca/voto/{{ c.ve_id }}" class="voto-card {{ c.ve_resultado or 'encerrada' }}">
+  <div class="v-header">
+    <div class="v-titulo">{{ c.gcfg.emoji }} {{ c.titulo }}</div>
+    <span class="v-badge" style="background:{{ '#e8f5e9' if c.ve_resultado=='aprovada' else '#f5f5f5' }};color:{{ '#1B5E20' if c.ve_resultado=='aprovada' else '#555' }}">
+      {{ '✅ Aprovada' if c.ve_resultado=='aprovada' else '❌ Rejeitada' if c.ve_resultado=='rejeitada' else '🏁 Encerrada' }}
+    </span>
+  </div>
+  <div class="v-meta">
+    <span>{{ c.total_votos }} votos</span>
+    <span>{{ c.pct_sim }}% SIM</span>
+    <span>{{ c.votos_nao or 0 }} NÃO</span>
+  </div>
+</a>
+{% endfor %}
+{% endif %}
+
+<!-- NOTIFICAÇÕES RECENTES -->
+<div class="section-title">📢 Notificações Enviadas</div>
+<div style="background:white;border-radius:12px;padding:1.2rem;box-shadow:0 2px 8px rgba(0,0,0,.06)">
+  {% for n in notifs %}
+  <div class="notif-item">
+    <span style="font-size:1.1rem">📡</span>
+    <div>
+      <div style="font-weight:600;font-size:.82rem">{{ n.mensagem[:100] }}{% if n.mensagem|length > 100 %}...{% endif %}</div>
+      <div style="font-size:.72rem;color:#999;margin-top:2px">
+        📍 {{ n.zona }} {% if n.estado %}({{ n.estado }}){% endif %} &nbsp;|&nbsp;
+        👥 {{ '{:,}'.format(n.cidadaos_estimados) }} notificados &nbsp;|&nbsp;
+        ✅ {{ '{:,}'.format(n.confirmadas) }} confirmações &nbsp;|&nbsp;
+        {{ n.enviada_em[:16] }}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

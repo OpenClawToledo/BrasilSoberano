@@ -45,13 +45,14 @@
 
         <!-- 🏛️ GOVERNO -->
         <div class="nav-group">
-          <button class="nav-group-btn {% if request.path.startswith('/painel') or request.path in ['/simulador','/governar'] %}active{% endif %}">🏛️ Governo ▾</button>
+          <button class="nav-group-btn {% if request.path.startswith('/painel') or request.path in ['/simulador','/governar'] or request.path.startswith('/governanca') %}active{% endif %}">🏛️ Governo ▾</button>
           <div class="nav-dropdown">
             <a href="/painel">📋 Painel de Projetos</a>
             <a href="/painel?tab=leis">📜 Leis</a>
             <a href="/painel?tab=processos">⚖️ Processos</a>
             <a href="/governar">🗳️ Votações</a>
             <a href="/simulador">🎯 Simulador</a>
+            <a href="/governanca" style="border-top:1px solid rgba(255,255,255,0.1);margin-top:4px;padding-top:8px">🔴 Governança do App</a>
           </div>
         </div>
 

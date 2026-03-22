@@ -1,0 +1,303 @@
+{% extends 'base.html' %}
+{% block title %}🗳️ Votação Ao Vivo — {{ event.titulo[:40] }}{% endblock %}
+{% block content %}
+<style>
+.voto-hero{padding:2rem;border-radius:16px;margin-bottom:1.5rem;color:white;position:relative;overflow:hidden}
+.voto-hero::after{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:repeating-linear-gradient(45deg,transparent,transparent 10px,rgba(255,255,255,.03) 10px,rgba(255,255,255,.03) 20px)}
+.live-strip{background:#E53935;color:white;text-align:center;padding:.6rem;border-radius:8px;font-weight:700;font-size:.9rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:center;gap:8px;animation:pulse-bg 2s infinite}
+@keyframes pulse-bg{0%,100%{background:#E53935}50%{background:#C62828}}
+.live-dot{width:10px;height:10px;background:white;border-radius:50%;animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+@media(max-width:768px){.grid2{grid-template-columns:1fr}}
+.card{background:white;border-radius:12px;padding:1.4rem;box-shadow:0 2px 12px rgba(0,0,0,.07);margin-bottom:1rem}
+.card h3{font-size:.95rem;margin:0 0 1rem;color:#333;border-bottom:2px solid #f0f0f0;padding-bottom:.5rem}
+.contadores{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem}
+.contador{text-align:center;border-radius:10px;padding:1rem}
+.contador.sim{background:#e8f5e9}
+.contador.nao{background:#ffebee}
+.contador.abs{background:#f5f5f5}
+.contador .val{font-size:2.2rem;font-weight:800}
+.contador.sim .val{color:#1B5E20}
+.contador.nao .val{color:#C62828}
+.contador.abs .val{color:#777}
+.contador .lbl{font-size:.78rem;color:#777;margin-top:2px}
+.progress-grande{margin:1rem 0}
+.progress-grande .lbl-row{display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:4px}
+.progress-grande .track{background:#f0f0f0;border-radius:20px;height:14px;overflow:hidden}
+.progress-grande .fill{height:100%;border-radius:20px;background:linear-gradient(90deg,#43A047,#66BB6A);transition:width .4s}
+.quorum-row{display:flex;align-items:center;gap:10px;font-size:.85rem;margin:.6rem 0}
+.quorum-ok{color:#1B5E20;font-weight:700}
+.quorum-nok{color:#E65100;font-weight:700}
+.timer-box{background:linear-gradient(135deg,#4A148C,#6A1B9A);color:white;border-radius:12px;padding:1.2rem;text-align:center;margin-bottom:1rem}
+.timer-val{font-size:2rem;font-weight:800;font-variant-numeric:tabular-nums}
+.timer-lbl{font-size:.8rem;opacity:.85}
+.btn-voto{width:100%;border:none;border-radius:12px;padding:16px;font-size:1rem;font-weight:700;cursor:pointer;transition:all .2s;margin-bottom:.6rem;display:flex;align-items:center;justify-content:center;gap:10px}
+.btn-voto:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.2)}
+.btn-voto.sim{background:#43A047;color:white}
+.btn-voto.nao{background:#E53935;color:white}
+.btn-voto.abs{background:#757575;color:white}
+.btn-voto:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.ja-votou{background:#e8f5e9;border-radius:10px;padding:1rem;text-align:center;color:#1B5E20;font-weight:600;font-size:.9rem;margin-bottom:1rem}
+.resultado-box{border-radius:12px;padding:1.5rem;text-align:center;margin-bottom:1rem}
+.resultado-box.aprovada{background:#e8f5e9;color:#1B5E20}
+.resultado-box.rejeitada{background:#ffebee;color:#C62828}
+.resultado-val{font-size:2rem;font-weight:800;margin:0 0 .3rem}
+.nota-item{border-left:3px solid #4A148C;padding:.4rem .4rem .4rem .8rem;margin-bottom:.5rem;font-size:.85rem;color:#444}
+.nota-hora{font-size:.72rem;color:#999}
+.registro-item{display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid #f5f5f5;font-size:.8rem}
+.registro-item:last-child{border-bottom:none}
+.notif-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.7rem;background:#f3e5f5;color:#7B1FA2;font-weight:600}
+.zone-info{background:#f9f9f9;border-radius:10px;padding:.8rem;font-size:.82rem;color:#444;line-height:1.6;margin-bottom:1rem}
+</style>
+
+<a href="/governanca" style="display:inline-flex;align-items:center;gap:6px;color:#555;text-decoration:none;font-size:.88rem;margin-bottom:1rem">← Voltar para Governança</a>
+
+{% if aberto %}
+<div class="live-strip">
+  <div class="live-dot"></div>
+  VOTAÇÃO AO VIVO — Atualiza a cada 3 segundos
+</div>
+{% endif %}
+
+<!-- HERO -->
+<div class="voto-hero" style="background:linear-gradient(135deg,{{ gcfg.cor }},{{ gcfg.cor }}aa)">
+  <div style="font-size:.8rem;opacity:.8;margin-bottom:.3rem">{{ gcfg.emoji }} Gravidade {{ event.gravidade }}: {{ gcfg.nome }} &nbsp;|&nbsp; Zona: {{ event.zona }}</div>
+  <h1 style="font-size:1.4rem;margin:0 0 .3rem">{{ event.titulo }}</h1>
+  {% if change %}<p style="margin:0;opacity:.88;font-size:.88rem">{{ change.descricao[:120] }}{% if change.descricao|length > 120 %}...{% endif %}</p>{% endif %}
+  <div style="margin-top:.6rem;font-size:.82rem;opacity:.8">
+    📅 Início: {{ event.inicio[:16] }} &nbsp;|&nbsp; 🏁 Fim: {{ event.fim[:16] }} &nbsp;|&nbsp;
+    👥 {{ '{:,}'.format(event.cidadaos_notificados) }} cidadãos notificados
+  </div>
+</div>
+
+<div class="grid2">
+  <!-- COLUNA 1: RESULTADOS AO VIVO -->
+  <div>
+    <!-- TIMER -->
+    {% if aberto %}
+    <div class="timer-box">
+      <div class="timer-lbl">Tempo restante</div>
+      <div class="timer-val" id="timer">{{ tempo_r }}</div>
+      <div class="timer-lbl" style="margin-top:.3rem">Prazo: {{ event.fim[:16] }} UTC</div>
+    </div>
+    {% endif %}
+
+    <!-- RESULTADO FINAL (encerrado) -->
+    {% if event.resultado %}
+    <div class="resultado-box {{ event.resultado }}">
+      <div class="resultado-val">{{ '✅ APROVADA' if event.resultado == 'aprovada' else '❌ REJEITADA' }}</div>
+      <div style="font-size:.88rem">{{ 'Unanimidade atingida — mudança aprovada para implementação.' if event.resultado=='aprovada' else 'Um ou mais votos NÃO encerram a proposta. A regra dos 100% foi ativada.' }}</div>
+    </div>
+    {% endif %}
+
+    <!-- CONTADORES AO VIVO -->
+    <div class="card">
+      <h3>📊 Contagem em tempo real</h3>
+      <div class="contadores">
+        <div class="contador sim"><div class="val" id="cnt-sim">{{ event.votos_sim or 0 }}</div><div class="lbl">✅ SIM</div></div>
+        <div class="contador nao"><div class="val" id="cnt-nao">{{ event.votos_nao or 0 }}</div><div class="lbl">❌ NÃO</div></div>
+        <div class="contador abs"><div class="val" id="cnt-abs">{{ event.votos_abstencao or 0 }}</div><div class="lbl">— Abstenção</div></div>
+      </div>
+      <div class="progress-grande">
+        <div class="lbl-row">
+          <span>% SIM</span>
+          <strong id="pct-sim">{{ pct_sim }}%</strong>
+        </div>
+        <div class="track">
+          <div class="fill" id="bar-sim" style="width:{{ pct_sim }}%"></div>
+        </div>
+      </div>
+      <div class="quorum-row">
+        <span id="quorum-txt" class="{{ 'quorum-ok' if quorum_ok else 'quorum-nok' }}">
+          {{ '✅ Quorum atingido' if quorum_ok else '⚠️ Quorum insuficiente' }}
+        </span>
+        <span style="color:#999">(<span id="total-votos">{{ total_v }}</span>/{{ event.quorum_minimo }} mínimo)</span>
+      </div>
+      <div style="font-size:.78rem;color:#777;text-align:center;margin-top:.3rem">
+        100% SIM + quorum ≥ {{ event.quorum_minimo }} = aprovação imediata &nbsp;|&nbsp; 1 voto NÃO = rejeição imediata
+      </div>
+    </div>
+
+    <!-- BOTÕES DE VOTO -->
+    {% if aberto %}
+      {% if ja_votou %}
+      <div class="ja-votou">
+        ✅ Você votou: <strong>{{ ja_votou.voto.upper() }}</strong><br>
+        <small style="font-weight:400">Cada sessão pode votar uma vez.</small>
+      </div>
+      {% else %}
+      <div class="card">
+        <h3>🗳️ Seu voto</h3>
+        <div id="zona-select" style="margin-bottom:1rem">
+          <label style="font-size:.8rem;font-weight:700;color:#555;display:block;margin-bottom:4px">Sua zona</label>
+          <select id="minha-zona" style="width:100%;padding:8px;border:2px solid #e0e0e0;border-radius:8px;font-size:.85rem">
+            <option value="federal">🇧🇷 Federal</option>
+            <option value="estado">🗺️ Estado</option>
+            <option value="cidade">🏙️ Cidade</option>
+            <option value="bairro">🏘️ Bairro</option>
+          </select>
+        </div>
+        <button class="btn-voto sim" onclick="votar('sim')" id="btn-sim">✅ Voto SIM — Aprovar esta mudança</button>
+        <button class="btn-voto nao" onclick="votar('nao')" id="btn-nao">❌ Voto NÃO — Rejeitar imediatamente</button>
+        <button class="btn-voto abs" onclick="votar('abstencao')" id="btn-abs">— Abstenção</button>
+        <div style="font-size:.75rem;color:#E53935;text-align:center;margin-top:.3rem;font-weight:600">
+          ⚠️ Um voto NÃO encerra e rejeita a proposta imediatamente. Decisão irreversível.
+        </div>
+        <div id="voto-msg" style="display:none;margin-top:.5rem;padding:.8rem;border-radius:8px;font-size:.85rem;font-weight:600;text-align:center"></div>
+      </div>
+      {% endif %}
+    {% endif %}
+  </div>
+
+  <!-- COLUNA 2: CONTEXTO E LOG -->
+  <div>
+    <!-- ZONA E NOTIFICAÇÕES -->
+    <div class="card">
+      <h3>📡 Notificações Enviadas</h3>
+      <div class="zone-info">
+        Zona de impacto: <strong>{{ event.zona|upper }}</strong><br>
+        Cidadãos estimados notificados: <strong>{{ '{:,}'.format(event.cidadaos_notificados) }}</strong><br>
+        Quorum mínimo: <strong>{{ event.quorum_minimo }} votos</strong>
+      </div>
+      {% for n in notifs %}
+      <div style="background:#f9f9f9;border-radius:8px;padding:.6rem;margin-bottom:.5rem">
+        <div style="font-size:.78rem;font-weight:600;color:#4A148C">{{ n.canal|upper }} — {{ n.zona }}{% if n.estado %}/{{ n.estado }}{% endif %}</div>
+        <div style="font-size:.82rem;color:#444;margin:.2rem 0">{{ n.mensagem[:120] }}</div>
+        <div style="font-size:.72rem;color:#999">👥 {{ '{:,}'.format(n.cidadaos_estimados) }} notificados &nbsp;|&nbsp; ✅ {{ '{:,}'.format(n.confirmadas) }} confirmaram &nbsp;|&nbsp; {{ n.enviada_em[:16] }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- NOTAS AO VIVO -->
+    <div class="card">
+      <h3>📝 Notas ao vivo</h3>
+      <div id="notas-lista">
+        {% for nota in notas %}
+        <div class="nota-item">
+          <div class="nota-hora">{{ nota.hora }}</div>
+          {{ nota.nota }}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- REGISTROS RECENTES -->
+    <div class="card">
+      <h3>🕐 Votos recentes</h3>
+      <div id="registros-lista">
+        {% for r in registros_recentes %}
+        <div class="registro-item">
+          <span style="font-size:1.1rem">{{ '✅' if r.voto=='sim' else '❌' if r.voto=='nao' else '—' }}</span>
+          <span style="font-weight:600;color:{{ '#1B5E20' if r.voto=='sim' else '#C62828' if r.voto=='nao' else '#777' }}">{{ r.voto.upper() }}</span>
+          <span class="notif-badge">{{ r.zona or 'federal' }}</span>
+          <span style="font-size:.7rem;color:#999;margin-left:auto">{{ r.created_at[11:16] }}</span>
+        </div>
+        {% endfor %}
+        {% if not registros_recentes %}
+        <p style="color:#999;font-size:.85rem">Nenhum voto ainda.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- CHANGE INFO -->
+    {% if change and change.github_pr %}
+    <div class="card">
+      <h3>🔗 Código Proposto</h3>
+      <div style="font-size:.85rem;color:#555;margin-bottom:.5rem">Função afetada: <strong>{{ change.funcao_afetada }}</strong></div>
+      <a href="{{ change.github_pr }}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;color:#1565C0;font-size:.85rem;font-weight:600">📦 Ver código no GitHub →</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+const VID = {{ event.id }};
+const ABERTO = {{ 'true' if aberto else 'false' }};
+let lastNota = {{ notas|length }};
+
+async function votar(tipo){
+  const zona = document.getElementById('minha-zona').value;
+  ['sim','nao','abs'].forEach(b => document.getElementById('btn-'+b).disabled=true);
+  const res = await fetch(`/governanca/voto/${VID}/votar`,{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({voto:tipo, zona})
+  });
+  const d = await res.json();
+  const msg = document.getElementById('voto-msg');
+  msg.style.display='block';
+  if(d.error){
+    msg.style.background='#ffebee'; msg.style.color='#C62828';
+    msg.textContent = '⚠️ ' + d.error;
+    ['sim','nao','abs'].forEach(b => document.getElementById('btn-'+b).disabled=false);
+  } else {
+    const cor = tipo=='sim'?'#e8f5e9':tipo=='nao'?'#ffebee':'#f5f5f5';
+    const txtcor = tipo=='sim'?'#1B5E20':tipo=='nao'?'#C62828':'#555';
+    msg.style.background=cor; msg.style.color=txtcor;
+    msg.textContent = '✅ Voto registrado: ' + tipo.toUpperCase() + (d.novo_status ? ' — ' + d.novo_status.toUpperCase() : '');
+    atualizarContadores(d);
+    if(d.novo_status){
+      setTimeout(()=>location.reload(),1500);
+    }
+  }
+}
+
+function atualizarContadores(d){
+  document.getElementById('cnt-sim').textContent = d.votos_sim || 0;
+  document.getElementById('cnt-nao').textContent = d.votos_nao || 0;
+  document.getElementById('cnt-abs').textContent = d.votos_abstencao || 0;
+  document.getElementById('total-votos').textContent = d.total || 0;
+  document.getElementById('pct-sim').textContent = (d.pct_sim||0)+'%';
+  document.getElementById('bar-sim').style.width = (d.pct_sim||0)+'%';
+  const qEl = document.getElementById('quorum-txt');
+  qEl.textContent = d.quorum_ok ? '✅ Quorum atingido' : '⚠️ Quorum insuficiente';
+  qEl.className = d.quorum_ok ? 'quorum-ok' : 'quorum-nok';
+}
+
+async function atualizarLive(){
+  if(!ABERTO) return;
+  try{
+    const res = await fetch(`/governanca/voto/${VID}/live`);
+    const d = await res.json();
+    atualizarContadores(d);
+    // Notas novas
+    if(d.notas && d.notas.length > 0){
+      const lista = document.getElementById('notas-lista');
+      d.notas.slice(-3).forEach(n=>{
+        if(lista.innerHTML.indexOf(n.nota)<0){
+          lista.innerHTML += `<div class="nota-item"><div class="nota-hora">${n.hora}</div>${n.nota}</div>`;
+        }
+      });
+    }
+    // Votos recentes
+    if(d.recentes && d.recentes.length>0){
+      const rl = document.getElementById('registros-lista');
+      rl.innerHTML = d.recentes.map(r=>`
+        <div class="registro-item">
+          <span style="font-size:1.1rem">${r.voto=='sim'?'✅':r.voto=='nao'?'❌':'—'}</span>
+          <span style="font-weight:600;color:${r.voto=='sim'?'#1B5E20':r.voto=='nao'?'#C62828':'#777'}">${r.voto.toUpperCase()}</span>
+          <span class="notif-badge">${r.zona||'federal'}</span>
+          <span style="font-size:.7rem;color:#999;margin-left:auto">${(r.created_at||'').slice(11,16)}</span>
+        </div>`).join('');
+    }
+    if(!d.aberto && d.status !== 'em_andamento'){
+      setTimeout(()=>location.reload(),1000);
+    }
+  } catch(e){}
+}
+
+// Timer countdown
+function atualizarTimer(){
+  const el = document.getElementById('timer');
+  if(!el) return;
+  fetch(`/governanca/voto/${VID}/live`).then(r=>r.json()).then(d=>{
+    if(el) el.textContent = d.tempo_restante;
+  }).catch(()=>{});
+}
+
+if(ABERTO){
+  setInterval(atualizarLive, 3000);
+  setInterval(atualizarTimer, 1000);
+}
+</script>
+{% endblock %}

@@ -643,6 +643,279 @@ def votar_denuncia(vid):
     return jsonify(dict(row))
 
 
+# ─── GOVERNANÇA ABERTA — Votações ao vivo, 100% aprovação ───────────────────
+
+import datetime as _dt
+import hashlib as _hashlib
+
+GRAVIDADE_CFG = {
+    1: {"nome":"Correção",             "emoji":"🟢","duracao_horas":6,   "zona":"bairro", "quorum":5,   "cor":"#43A047","desc":"Bug fix ou texto errado"},
+    2: {"nome":"Melhoria",             "emoji":"🟡","duracao_horas":24,  "zona":"cidade", "quorum":10,  "cor":"#FFB300","desc":"Melhoria de interface ou conteúdo"},
+    3: {"nome":"Nova Função",          "emoji":"🟠","duracao_horas":72,  "zona":"estado", "quorum":25,  "cor":"#F4511E","desc":"Nova seção ou funcionalidade"},
+    4: {"nome":"Mudança Estrutural",   "emoji":"🔴","duracao_horas":168, "zona":"federal","quorum":50,  "cor":"#C62828","desc":"Altera regras ou arquitetura do app"},
+    5: {"nome":"Regra Constitucional", "emoji":"⛔","duracao_horas":720, "zona":"todos",  "quorum":100, "cor":"#4A148C","desc":"Muda a governança do próprio app"},
+}
+
+
+def _session_hash(request):
+    """Hash anônimo da sessão para evitar duplo voto."""
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr or 'anon')
+    ua = request.headers.get('User-Agent', '')
+    return _hashlib.sha256(f"{ip}:{ua}".encode()).hexdigest()[:32]
+
+
+def _is_voting_open(event):
+    try:
+        now = _dt.datetime.utcnow()
+        inicio = _dt.datetime.fromisoformat(event['inicio'])
+        fim = _dt.datetime.fromisoformat(event['fim'])
+        return inicio <= now <= fim and event['status'] == 'em_andamento'
+    except:
+        return False
+
+
+def _tempo_restante(fim_str):
+    try:
+        fim = _dt.datetime.fromisoformat(fim_str)
+        delta = fim - _dt.datetime.utcnow()
+        total = int(delta.total_seconds())
+        if total <= 0:
+            return "Encerrado"
+        d, r = divmod(total, 86400)
+        h, r = divmod(r, 3600)
+        m, s = divmod(r, 60)
+        if d > 0:
+            return f"{d}d {h}h {m}m"
+        elif h > 0:
+            return f"{h}h {m}m {s}s"
+        else:
+            return f"{m}m {s}s"
+    except:
+        return "—"
+
+
+def _check_approval(event):
+    """100% SIM + quorum mínimo = aprovada."""
+    total = (event['votos_sim'] or 0) + (event['votos_nao'] or 0)
+    quorum = event['quorum_minimo'] or 1
+    if total < quorum:
+        return None  # quorum não atingido
+    if (event['votos_nao'] or 0) > 0:
+        return False  # qualquer NÃO rejeita
+    return True  # 100% SIM + quorum
+
+
+@app.route('/governanca')
+def governanca():
+    changes = query_db("""
+        SELECT ac.*, ve.id as ve_id, ve.votos_sim, ve.votos_nao, ve.votos_abstencao,
+               ve.inicio, ve.fim, ve.status as ve_status, ve.quorum_minimo,
+               ve.cidadaos_notificados, ve.resultado as ve_resultado
+        FROM app_changes ac
+        LEFT JOIN voting_events ve ON ve.change_id = ac.id
+        ORDER BY ac.gravidade DESC, ac.created_at DESC
+    """)
+    changes_list = []
+    for c in changes:
+        cd = dict(c)
+        cd['gcfg'] = GRAVIDADE_CFG.get(c['gravidade'], GRAVIDADE_CFG[1])
+        cd['tempo_restante'] = _tempo_restante(c['fim']) if c['fim'] else None
+        cd['aberto'] = _is_voting_open(c) if c['fim'] else False
+        total_v = (c['votos_sim'] or 0) + (c['votos_nao'] or 0)
+        cd['pct_sim'] = round(c['votos_sim'] / total_v * 100, 1) if total_v > 0 else 0
+        cd['total_votos'] = total_v
+        changes_list.append(cd)
+
+    # Votação ao vivo ativa
+    ao_vivo = [c for c in changes_list if c.get('ve_status') == 'em_andamento']
+    encerradas = [c for c in changes_list if c.get('ve_status') == 'encerrada']
+    propostas = [c for c in changes_list if c['status'] == 'proposta']
+
+    notifs = query_db('SELECT * FROM zone_notifications ORDER BY enviada_em DESC LIMIT 10')
+    return render_template('governanca.html',
+                           changes=changes_list, ao_vivo=ao_vivo,
+                           encerradas=encerradas, propostas=propostas,
+                           gravidade_cfg=GRAVIDADE_CFG,
+                           notifs=notifs)
+
+
+@app.route('/governanca/voto/<int:vid>')
+def governanca_voto(vid):
+    event = query_db('SELECT * FROM voting_events WHERE id=?', (vid,), one=True)
+    if not event:
+        return render_template('404.html'), 404
+    change = query_db('SELECT * FROM app_changes WHERE id=?', (event['change_id'],), one=True)
+    gcfg = GRAVIDADE_CFG.get(event['gravidade'], GRAVIDADE_CFG[1])
+    aberto = _is_voting_open(event)
+    tempo_r = _tempo_restante(event['fim'])
+    total_v = (event['votos_sim'] or 0) + (event['votos_nao'] or 0)
+    pct_sim = round(event['votos_sim'] / total_v * 100, 1) if total_v > 0 else 0
+    quorum_ok = total_v >= (event['quorum_minimo'] or 1)
+    aprovacao = _check_approval(event)
+    session_hash = _session_hash(request)
+    ja_votou = query_db('SELECT voto FROM voting_records WHERE voting_event_id=? AND session_hash=?',
+                        (vid, session_hash), one=True)
+    notas = []
+    try: notas = json.loads(event['notas_ao_vivo'] or '[]')
+    except: pass
+    notifs = query_db('SELECT * FROM zone_notifications WHERE voting_event_id=? ORDER BY enviada_em DESC', (vid,))
+    registros_recentes = query_db("""
+        SELECT voto, zona, estado, created_at FROM voting_records
+        WHERE voting_event_id=? ORDER BY created_at DESC LIMIT 20
+    """, (vid,))
+    return render_template('governanca_voto.html',
+                           event=dict(event), change=change, gcfg=gcfg,
+                           aberto=aberto, tempo_r=tempo_r,
+                           total_v=total_v, pct_sim=pct_sim,
+                           quorum_ok=quorum_ok, aprovacao=aprovacao,
+                           ja_votou=ja_votou, notas=notas,
+                           notifs=notifs, registros_recentes=registros_recentes)
+
+
+@app.route('/governanca/voto/<int:vid>/votar', methods=['POST'])
+def governanca_votar(vid):
+    event = query_db('SELECT * FROM voting_events WHERE id=?', (vid,), one=True)
+    if not event:
+        return jsonify({'error': 'Votação não encontrada'}), 404
+    if not _is_voting_open(event):
+        return jsonify({'error': 'Votação encerrada ou não iniciada'}), 400
+
+    data = request.get_json() or {}
+    voto = data.get('voto')  # 'sim', 'nao', 'abstencao'
+    if voto not in ('sim', 'nao', 'abstencao'):
+        return jsonify({'error': 'Voto inválido'}), 400
+
+    session_hash = _session_hash(request)
+    zona = data.get('zona', 'federal')
+    estado = data.get('estado', '')
+
+    # Impede duplo voto
+    ja = query_db('SELECT id FROM voting_records WHERE voting_event_id=? AND session_hash=?',
+                  (vid, session_hash), one=True)
+    if ja:
+        return jsonify({'error': 'Você já votou nesta sessão', 'ja_votou': True}), 400
+
+    db_conn = get_db()
+    db_conn.execute('INSERT INTO voting_records (voting_event_id,session_hash,voto,zona,estado) VALUES (?,?,?,?,?)',
+                    (vid, session_hash, voto, zona, estado))
+
+    col = {'sim': 'votos_sim', 'nao': 'votos_nao', 'abstencao': 'votos_abstencao'}[voto]
+    db_conn.execute(f'UPDATE voting_events SET {col}={col}+1 WHERE id=?', (vid,))
+
+    # Verificar se agora está aprovada ou rejeitada
+    updated = query_db('SELECT * FROM voting_events WHERE id=?', (vid,), one=True)
+    aprovacao = _check_approval(updated)
+    novo_status = None
+    if aprovacao is True:
+        db_conn.execute("UPDATE voting_events SET status='encerrada',resultado='aprovada' WHERE id=?", (vid,))
+        db_conn.execute("UPDATE app_changes SET status='aprovada',aprovada_em=datetime('now') WHERE id=?",
+                        (updated['change_id'],))
+        novo_status = 'aprovada'
+    elif aprovacao is False:
+        db_conn.execute("UPDATE voting_events SET status='encerrada',resultado='rejeitada' WHERE id=?", (vid,))
+        db_conn.execute("UPDATE app_changes SET status='rejeitada',rejeitada_em=datetime('now'),motivo_rejeicao='Voto NÃO recebido — regra dos 100%' WHERE id=?",
+                        (updated['change_id'],))
+        novo_status = 'rejeitada'
+
+    db_conn.commit()
+
+    total_v = (updated['votos_sim'] or 0) + (updated['votos_nao'] or 0)
+    pct_sim = round(updated['votos_sim'] / total_v * 100, 1) if total_v > 0 else 0
+    return jsonify({
+        'ok': True,
+        'votos_sim': updated['votos_sim'],
+        'votos_nao': updated['votos_nao'],
+        'votos_abstencao': updated['votos_abstencao'],
+        'total': total_v,
+        'pct_sim': pct_sim,
+        'quorum_ok': total_v >= (updated['quorum_minimo'] or 1),
+        'novo_status': novo_status,
+    })
+
+
+@app.route('/governanca/voto/<int:vid>/live')
+def governanca_live(vid):
+    """Endpoint de polling para atualização ao vivo."""
+    event = query_db('SELECT * FROM voting_events WHERE id=?', (vid,), one=True)
+    if not event:
+        return jsonify({'error': 'não encontrado'}), 404
+    total_v = (event['votos_sim'] or 0) + (event['votos_nao'] or 0)
+    pct_sim = round(event['votos_sim'] / total_v * 100, 1) if total_v > 0 else 0
+    try: notas = json.loads(event['notas_ao_vivo'] or '[]')
+    except: notas = []
+    recentes = query_db("""
+        SELECT voto, zona, estado, created_at FROM voting_records
+        WHERE voting_event_id=? ORDER BY created_at DESC LIMIT 10
+    """, (vid,))
+    return jsonify({
+        'votos_sim': event['votos_sim'] or 0,
+        'votos_nao': event['votos_nao'] or 0,
+        'votos_abstencao': event['votos_abstencao'] or 0,
+        'total': total_v,
+        'pct_sim': pct_sim,
+        'quorum_minimo': event['quorum_minimo'],
+        'quorum_ok': total_v >= (event['quorum_minimo'] or 1),
+        'status': event['status'],
+        'resultado': event['resultado'],
+        'tempo_restante': _tempo_restante(event['fim']),
+        'aberto': _is_voting_open(event),
+        'notas': notas[-5:],
+        'recentes': [dict(r) for r in recentes],
+    })
+
+
+@app.route('/governanca/proposta/nova', methods=['GET', 'POST'])
+def governanca_nova_proposta():
+    if request.method == 'POST':
+        data = request.form
+        gravidade = int(data.get('gravidade', 1))
+        gcfg = GRAVIDADE_CFG.get(gravidade, GRAVIDADE_CFG[1])
+        db_conn = get_db()
+        db_conn.execute("""
+            INSERT INTO app_changes (titulo,descricao,tipo,gravidade,proponente,github_pr,funcao_afetada,zona,estado)
+            VALUES (?,?,?,?,?,?,?,?,?)""",
+            (data['titulo'], data['descricao'], data.get('tipo','funcao'),
+             gravidade, data.get('proponente','Cidadão Anônimo'),
+             data.get('github_pr',''), data.get('funcao_afetada',''),
+             gcfg['zona'], data.get('estado','')))
+        new_id = db_conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+
+        # Criar votação automática
+        now = _dt.datetime.utcnow()
+        fim = now + _dt.timedelta(hours=gcfg['duracao_horas'])
+        db_conn.execute("""
+            INSERT INTO voting_events
+            (change_id,titulo,gravidade,zona,estado,inicio,fim,duracao_horas,quorum_minimo,cidadaos_notificados,status,notas_ao_vivo)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (new_id, data['titulo'], gravidade, gcfg['zona'], data.get('estado',''),
+             now.strftime('%Y-%m-%d %H:%M:%S'), fim.strftime('%Y-%m-%d %H:%M:%S'),
+             gcfg['duracao_horas'], gcfg['quorum'],
+             _estimar_cidadaos(gcfg['zona'], data.get('estado','')),
+             'em_andamento',
+             json.dumps([{"hora": now.strftime('%H:%M'), "nota": f"🚨 Votação aberta. Gravidade {gravidade}: {gcfg['nome']}. Prazo: {gcfg['duracao_horas']}h."}])))
+        ve_id = db_conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+
+        # Notificação automática
+        cidadaos = _estimar_cidadaos(gcfg['zona'], data.get('estado',''))
+        msg = f"🗳️ Nova votação: {data['titulo']} | Prazo: {gcfg['duracao_horas']}h | soberano.fiosmj.com/governanca/voto/{ve_id}"
+        db_conn.execute("""INSERT INTO zone_notifications (voting_event_id,zona,estado,canal,mensagem,cidadaos_estimados,confirmadas)
+            VALUES (?,?,?,?,?,?,?)""",
+            (ve_id, gcfg['zona'], data.get('estado',''), 'portal', msg, cidadaos, int(cidadaos * 0.68)))
+        db_conn.commit()
+        return jsonify({'ok': True, 'voting_event_id': ve_id, 'redirect': f'/governanca/voto/{ve_id}'})
+
+    return render_template('governanca_proposta.html', gravidade_cfg=GRAVIDADE_CFG)
+
+
+def _estimar_cidadaos(zona, estado=''):
+    """Estimativa de cidadãos notificados por zona."""
+    estimativas = {
+        'bairro': 2500, 'cidade': 85000, 'estado': 1200000,
+        'federal': 85000000, 'todos': 215000000
+    }
+    return estimativas.get(zona, 85000000)
+
+
 # ─── PREVIDÊNCIA — Simulador de Aposentadoria ────────────────────────────────
 
 REGRAS_APOS = {
